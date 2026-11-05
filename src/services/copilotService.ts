@@ -244,23 +244,43 @@ Do'stona, samimiy, insoniy va lo'nda javob bering:
 `;
 
   const aiClient = new GoogleGenAI({ apiKey });
-  const models = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-flash-lite"];
+  // Fast models prioritized: gemini-3.5-flash-lite responds in ~1.2s
+  const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
   let replyText = "";
   let successfulModel = models[0];
 
   for (const m of models) {
     try {
-      const interaction = await aiClient.interactions.create({
+      // 1. Ultra-fast direct generation (1-2 seconds)
+      const res = await aiClient.models.generateContent({
         model: m,
-        input: `${systemInstruction}\n\n${prompt}`,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          maxOutputTokens: 350,
+          temperature: 0.7,
+        },
       });
-      replyText = interaction.output_text || "";
+      replyText = res.text?.trim() || "";
       if (replyText) {
         successfulModel = m;
         break;
       }
     } catch (err: any) {
-      console.warn(`Copilot model ${m} xatosi:`, err.message);
+      // 2. Fallback to interactions API if needed
+      try {
+        const interaction = await aiClient.interactions.create({
+          model: m,
+          input: `${systemInstruction}\n\n${prompt}`,
+        });
+        replyText = interaction.output_text?.trim() || "";
+        if (replyText) {
+          successfulModel = m;
+          break;
+        }
+      } catch (err2: any) {
+        console.warn(`Copilot model ${m} xatosi:`, err2.message);
+      }
     }
   }
 

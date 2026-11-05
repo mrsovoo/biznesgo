@@ -129,7 +129,7 @@ Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra 
 `;
 
   let extractedList: any[] = [];
-  const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+  const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
   let lastError: any = null;
 
   for (const model of candidateModels) {
