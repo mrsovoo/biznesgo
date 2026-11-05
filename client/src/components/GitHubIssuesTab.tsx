@@ -185,3 +185,4 @@ export const GitHubIssuesTab: React.FC<GitHubIssuesTabProps> = ({
     </div>
   );
 };
+

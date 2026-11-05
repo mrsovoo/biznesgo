@@ -88,3 +88,4 @@ export const GitHubInsightsTab: React.FC<GitHubInsightsTabProps> = ({
     </div>
   );
 };
+

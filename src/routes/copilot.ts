@@ -24,6 +24,8 @@ router.post("/copilot/chat", async (req, res) => {
     res.json({
       success: true,
       reply: result.reply,
+      durationSeconds: result.durationSeconds,
+      thoughts: result.thoughts,
       data: result.data,
     });
   } catch (error: any) {

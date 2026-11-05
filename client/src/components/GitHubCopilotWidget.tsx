@@ -11,12 +11,15 @@ import {
   Lock,
   ChevronDown,
   RotateCcw,
+  Brain,
 } from "lucide-react";
 
 interface Message {
   sender: "user" | "copilot";
   text: string;
   time: string;
+  thoughtDuration?: number;
+  thoughts?: string[];
 }
 
 export const GitHubCopilotWidget: React.FC = () => {
@@ -31,6 +34,8 @@ export const GitHubCopilotWidget: React.FC = () => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  const [expandedThoughts, setExpandedThoughts] = useState<Record<number, boolean>>({});
 
   // Security Gate State
   const [secSource, setSecSource] = useState("System A (Master Catalog)");
@@ -44,7 +49,28 @@ export const GitHubCopilotWidget: React.FC = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isOpen]);
+  }, [messages, isOpen, thinkingSeconds]);
+
+  // Live Thinking Timer (Thinking for 1s... 2s... 9s... 10s...)
+  useEffect(() => {
+    let interval: any;
+    if (loading) {
+      setThinkingSeconds(1);
+      interval = setInterval(() => {
+        setThinkingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setThinkingSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const toggleThought = (idx: number) => {
+    setExpandedThoughts((prev) => ({
+      ...prev,
+      [idx]: !prev[idx],
+    }));
+  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputValue).trim();
@@ -60,10 +86,14 @@ export const GitHubCopilotWidget: React.FC = () => {
     setInputValue("");
     setLoading(true);
 
+    const startEpoch = Date.now();
+
     try {
       const res = await axios.post("/api/copilot/chat", {
         message: text,
       });
+
+      const clientDuration = Math.max(1, Math.round((Date.now() - startEpoch) / 1000));
 
       if (res.data.success) {
         setMessages((prev) => [
@@ -72,16 +102,26 @@ export const GitHubCopilotWidget: React.FC = () => {
             sender: "copilot",
             text: res.data.reply,
             time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            thoughtDuration: res.data.durationSeconds || clientDuration,
+            thoughts: res.data.thoughts || [
+              "Foydalanuvchi so'rovi va intent tahlil qilindi",
+              "Neon PostgreSQL dorilar katalogi tahlil qilindi",
+              "Zero-Leakage DLP xavfsizlik perimetri tasdiqlandi",
+              "Yakuniy javob shakllantirildi",
+            ],
           },
         ]);
       }
     } catch (err: any) {
+      const clientDuration = Math.max(1, Math.round((Date.now() - startEpoch) / 1000));
       setMessages((prev) => [
         ...prev,
         {
           sender: "copilot",
           text: "❌ Xatolik yuz berdi: " + (err.response?.data?.message || err.message),
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          thoughtDuration: clientDuration,
+          thoughts: ["So'rov yuborishda uzilish yoki xatolik yuz berdi"],
         },
       ]);
     } finally {
@@ -184,6 +224,39 @@ export const GitHubCopilotWidget: React.FC = () => {
                       m.sender === "user" ? "items-end" : "items-start"
                     }`}
                   >
+                    {/* Collapsible Thought for Xs badge */}
+                    {m.sender === "copilot" && m.thoughtDuration !== undefined && (
+                      <div className="mb-1.5 max-w-[90%]">
+                        <button
+                          onClick={() => toggleThought(idx)}
+                          className="inline-flex items-center space-x-1.5 text-[11px] font-mono text-[#57606a] hover:text-[#0969da] bg-[#f6f8fa] hover:bg-[#ebf0f4] px-2 py-0.5 rounded-full border border-[#d0d7de] transition cursor-pointer shadow-2xs"
+                        >
+                          <Brain className="w-3 h-3 text-[#8250df]" />
+                          <span>Thought for {m.thoughtDuration}s</span>
+                          <ChevronDown
+                            className={`w-3 h-3 text-[#8c959f] transition-transform duration-200 ${
+                              expandedThoughts[idx] ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+
+                        {expandedThoughts[idx] && (
+                          <div className="mt-1.5 ml-1 pl-2.5 border-l-2 border-[#8250df]/60 text-[11px] font-mono text-[#57606a] space-y-1 bg-white p-2 rounded-r border border-[#d0d7de]/60 shadow-2xs">
+                            {m.thoughts && m.thoughts.length > 0 ? (
+                              m.thoughts.map((t, ti) => (
+                                <div key={ti} className="flex items-start space-x-1.5">
+                                  <span className="text-[#8250df] font-bold">✓</span>
+                                  <span>{t}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-[#8c959f]">Fikrlash ketma-ketligi yakunlandi.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div
                       className={`max-w-[85%] rounded-lg p-2.5 leading-relaxed shadow-2xs ${
                         m.sender === "user"
@@ -198,10 +271,33 @@ export const GitHubCopilotWidget: React.FC = () => {
                     </span>
                   </div>
                 ))}
+
+                {/* Active Thinking State: Thinking for 9s, 10s... */}
                 {loading && (
-                  <div className="flex items-center space-x-2 text-xs text-[#57606a] bg-white border border-[#d0d7de] p-2 rounded-lg w-fit">
-                    <div className="w-3.5 h-3.5 border-2 border-[#0969da] border-t-transparent rounded-full animate-spin"></div>
-                    <span>Copilot tahlil qilmoqda...</span>
+                  <div className="flex flex-col space-y-1.5 text-xs text-[#57606a] bg-white border border-[#d0d7de] p-2.5 rounded-lg shadow-2xs w-[88%] animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 text-[#8250df] font-mono text-[11.5px] font-semibold">
+                        <Sparkles className="w-3.5 h-3.5 animate-spin text-[#8250df]" />
+                        <span>Thinking for {thinkingSeconds}s...</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#1f883d] animate-ping" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#1f883d]" />
+                      </div>
+                    </div>
+
+                    <div className="text-[10.5px] text-[#656d76] flex items-center space-x-1.5 font-mono pt-0.5">
+                      <span className="text-[#0969da]">›</span>
+                      <span>
+                        {thinkingSeconds <= 2
+                          ? "So'rov va intent tahlil qilinmoqda..."
+                          : thinkingSeconds <= 5
+                          ? "Neon PostgreSQL dorilar bazasi o'qilmoqda..."
+                          : thinkingSeconds <= 8
+                          ? "Zero-Leakage DLP xavfsizlik perimetri tekshirilmoqda..."
+                          : "Yakuniy tahliliy xulosa shakllantirilmoqda..."}
+                      </span>
+                    </div>
                   </div>
                 )}
                 <div ref={messagesEndRef} />

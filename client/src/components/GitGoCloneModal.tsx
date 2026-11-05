@@ -29,8 +29,22 @@ export const GitGoCloneModal: React.FC<GitGoCloneModalProps> = ({
   const [apiKey, setApiKey] = useState("");
   const [hasServerKey, setHasServerKey] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [report, setReport] = useState<any | null>(null);
+
+  useEffect(() => {
+    let interval: any;
+    if (loading) {
+      setThinkingSeconds(1);
+      interval = setInterval(() => {
+        setThinkingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setThinkingSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   useEffect(() => {
     if (isOpen) {
@@ -229,6 +243,22 @@ export const GitGoCloneModal: React.FC<GitGoCloneModalProps> = ({
               />
             </div>
 
+            {/* Active AI Thinking Banner */}
+            {loading && (
+              <div className="p-2.5 bg-[#f6f8fa] border border-[#8250df]/30 rounded-md flex items-center justify-between text-xs font-mono text-[#8250df] shadow-2xs animate-in fade-in">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-3.5 h-3.5 animate-spin text-[#8250df]" />
+                  <span className="font-semibold">Thinking for {thinkingSeconds}s...</span>
+                  <span className="text-[11px] text-[#57606a] hidden sm:inline">
+                    (Gemini AI sahifadagi dori preparatlarini tahlil qilmoqda)
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span className="w-2 h-2 rounded-full bg-[#1f883d] animate-ping" />
+                </div>
+              </div>
+            )}
+
             {/* Submit Button */}
             <div className="flex items-center justify-end space-x-2 pt-2">
               <button
@@ -244,7 +274,7 @@ export const GitGoCloneModal: React.FC<GitGoCloneModalProps> = ({
                 className="px-4 py-1.5 bg-[#1f883d] hover:bg-[#1a7f37] text-white text-xs font-semibold rounded-md shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{loading ? "AI skaner qilmoqda..." : "🚀 Clone & AI Import"}</span>
+                <span>{loading ? `Thinking for ${thinkingSeconds}s...` : "🚀 Clone & AI Import"}</span>
               </button>
             </div>
           </form>
