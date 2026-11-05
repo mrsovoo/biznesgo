@@ -15,7 +15,7 @@ import {
 interface GitGoCloneModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (repoName?: string) => void;
 }
 
 export const GitGoCloneModal: React.FC<GitGoCloneModalProps> = ({
@@ -103,7 +103,8 @@ export const GitGoCloneModal: React.FC<GitGoCloneModalProps> = ({
           `📦 Yangi bazaga qo'shildi: ${res.data.stats.addedCount} ta`,
           `⏭️ Mavjud bo'lgani uchun o'tkazib yuborildi: ${res.data.stats.skippedCount} ta`,
         ]);
-        onSuccess();
+        const targetRepo = res.data.reports?.[0]?.repoName;
+        onSuccess(targetRepo);
       }
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.message;

@@ -10,7 +10,17 @@ export interface Medicine {
   description?: string | null;
   source_url?: string | null;
   category?: string | null;
+  repository?: string | null;
   created_at: string;
+}
+
+export interface Repository {
+  id?: number;
+  name: string;
+  source_url?: string | null;
+  description?: string | null;
+  count?: number;
+  created_at?: string;
 }
 
 export interface Stats {

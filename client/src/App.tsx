@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { GitHubNavbar } from "./components/GitHubNavbar";
 import { GitHubRepoHeader } from "./components/GitHubRepoHeader";
+import { GitHubRepoSidebar } from "./components/GitHubRepoSidebar";
 import { GitHubMedicineTable } from "./components/GitHubMedicineTable";
 import { GitHubFileView } from "./components/GitHubFileView";
 import { GitHubSidebar } from "./components/GitHubSidebar";
@@ -9,9 +10,13 @@ import { GitHubFolderReadme } from "./components/GitHubFolderReadme";
 import { GitGoCloneModal } from "./components/GitGoCloneModal";
 import { GitHubCopilotWidget } from "./components/GitHubCopilotWidget";
 import { ImageModal } from "./components/ImageModal";
-import { Medicine, Stats, Commit } from "./types";
+import { Medicine, Stats, Commit, Repository } from "./types";
 
 export function App() {
+  const [repositories, setRepositories] = useState<Repository[]>([
+    { name: "biznesgo", description: "Markaziy master katalog", count: 0 },
+  ]);
+  const [currentRepo, setCurrentRepo] = useState<string>("biznesgo");
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -31,12 +36,27 @@ export function App() {
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string>("");
 
+  const fetchRepositories = useCallback(async () => {
+    try {
+      const res = await axios.get("/api/repositories");
+      if (res.data.success) {
+        setRepositories(res.data.data);
+      }
+    } catch (err) {
+      console.error("Repozitoriyalarni yuklashda xato:", err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [medRes, statsRes, commitsRes] = await Promise.all([
-        axios.get("/api/medicines"),
-        axios.get("/api/stats"),
+        axios.get("/api/medicines", {
+          params: { repository: currentRepo },
+        }),
+        axios.get("/api/stats", {
+          params: { repository: currentRepo },
+        }),
         axios.get("/api/commits", {
           params: { folder: currentFolder || undefined },
         }),
@@ -57,12 +77,17 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, [currentFolder]);
+  }, [currentFolder, currentRepo]);
+
+  useEffect(() => {
+    fetchRepositories();
+  }, [fetchRepositories]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 12000);
     const handleRefresh = () => {
+      fetchRepositories();
       fetchData();
     };
     window.addEventListener("gitgo:refresh_medicines", handleRefresh);
@@ -70,48 +95,54 @@ export function App() {
       clearInterval(interval);
       window.removeEventListener("gitgo:refresh_medicines", handleRefresh);
     };
-  }, [fetchData]);
+  }, [fetchData, fetchRepositories]);
 
   const handleDelete = async (id: number) => {
     try {
       const res = await axios.delete(`/api/medicines/${id}`);
       if (res.data.success) {
         setMedicines((prev) => prev.filter((m) => m.id !== id));
+        fetchRepositories();
         if (selectedMedicine?.id === id) {
           setSelectedMedicine(null);
         }
-        fetchData();
       }
     } catch (err) {
       alert("O'chirishda xatolik yuz berdi");
     }
   };
 
-  const handleResetBot = async () => {
-    if (
-      !confirm(
-        "Botning eski xotirasi, 'Launch App' menyusi va keraksiz buyruqlarini butunlay tozalab, botni toza holatga qaytarasizmi?"
-      )
-    ) {
-      return;
+  const handleDeleteRepo = async (name: string) => {
+    try {
+      const res = await axios.delete(`/api/repositories/${name}`);
+      if (res.data.success) {
+        setCurrentRepo("biznesgo");
+        fetchRepositories();
+        fetchData();
+      }
+    } catch (err) {
+      alert("Repozitoriyni o'chirishda xatolik yuz berdi");
     }
+  };
 
+  const handleResetBot = async () => {
+    if (!confirm("Telegram botning eski buyruqlarini tozalashni xohlaysizmi?")) return;
     try {
       setResetting(true);
-      const res = await axios.post("/api/bot/reset-menu");
+      const res = await axios.post("/api/bot/reset");
       if (res.data.success) {
-        alert("✅ " + res.data.message);
+        alert("✅ Telegram bot menyusi va eski xotirasi muvaffaqiyatli tozalandi!");
       }
     } catch (err: any) {
-      alert("❌ Xatolik yuz berdi: " + (err.response?.data?.error || err.message));
+      alert("Xatolik: " + (err.response?.data?.message || err.message));
     } finally {
       setResetting(false);
     }
   };
 
-  const handleViewImage = (url: string, name: string) => {
+  const handleViewImage = (url: string, title: string) => {
     setModalImage(url);
-    setModalTitle(name);
+    setModalTitle(title);
   };
 
   const handleTabChange = (tab: "code" | "medicines" | "insights") => {
@@ -140,56 +171,73 @@ export function App() {
         setActiveTab={handleTabChange}
         medicineCount={medicines.length}
         onOpenClone={() => setIsCloneModalOpen(true)}
+        currentRepo={currentRepo}
       />
 
-      {/* 3. Main Repo Body (GitHub 2-column layout) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6">
-        {selectedMedicine ? (
-          /* File Detail View (Code JSON + Image Inspector) */
-          <GitHubFileView
-            medicine={selectedMedicine}
-            onBack={() => setSelectedMedicine(null)}
-            onDelete={handleDelete}
-            onViewImage={handleViewImage}
-          />
-        ) : (
-          /* Repository Directory View + Right Sidebar */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-9 space-y-6">
-              <GitHubMedicineTable
-                medicines={medicines}
-                loading={loading}
-                onDelete={handleDelete}
-                onViewImage={handleViewImage}
-                onSelectMedicine={(m) => setSelectedMedicine(m)}
-                onRefresh={fetchData}
-                currentFolder={currentFolder}
-                setCurrentFolder={setCurrentFolder}
-                onOpenClone={() => setIsCloneModalOpen(true)}
-                latestCommit={latestCommit}
-                folderCommits={folderCommits}
-              />
+      {/* 3. Main Body: Left Repositories Sidebar + Center & Right Content */}
+      <div className="flex-1 w-full max-w-[1440px] mx-auto flex flex-col lg:flex-row min-h-0">
+        {/* Left: Repositories List */}
+        <GitHubRepoSidebar
+          repositories={repositories}
+          currentRepo={currentRepo}
+          onSelectRepo={(r) => {
+            setCurrentRepo(r);
+            setCurrentFolder(null);
+            setSelectedMedicine(null);
+          }}
+          onOpenNewRepoModal={() => setIsCloneModalOpen(true)}
+          onDeleteRepo={handleDeleteRepo}
+        />
 
-              {/* Folder-specific or Root README.md box below */}
-              <GitHubFolderReadme
-                currentFolder={currentFolder}
-                medicines={medicines}
-                totalCount={stats.total}
-                uniqueUsers={stats.uniqueUsers}
-                byUnit={stats.byUnit}
-              />
-            </div>
+        {/* Center & Right: Main Repo Area */}
+        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-7">
+          {selectedMedicine ? (
+            /* File Detail View (Code JSON + Image Inspector) */
+            <GitHubFileView
+              medicine={selectedMedicine}
+              onBack={() => setSelectedMedicine(null)}
+              onDelete={handleDelete}
+              onViewImage={handleViewImage}
+            />
+          ) : (
+            /* Repository Directory View + Right Sidebar */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-9 space-y-6 min-w-0">
+                <GitHubMedicineTable
+                  medicines={medicines}
+                  loading={loading}
+                  onDelete={handleDelete}
+                  onViewImage={handleViewImage}
+                  onSelectMedicine={(m) => setSelectedMedicine(m)}
+                  onRefresh={fetchData}
+                  currentFolder={currentFolder}
+                  setCurrentFolder={setCurrentFolder}
+                  onOpenClone={() => setIsCloneModalOpen(true)}
+                  latestCommit={latestCommit}
+                  folderCommits={folderCommits}
+                />
 
-            {/* GitHub Right Sidebar (About, Releases, Packages, Languages) */}
-            <div className="lg:col-span-3">
-              <GitHubSidebar
-                totalCount={stats.total}
-                uniqueUsers={stats.uniqueUsers}
-              />
+                {/* Folder-specific or Root README.md box below */}
+                <GitHubFolderReadme
+                  currentFolder={currentFolder}
+                  medicines={medicines}
+                  totalCount={stats.total}
+                  uniqueUsers={stats.uniqueUsers}
+                  byUnit={stats.byUnit}
+                />
+              </div>
+
+              {/* GitHub Right Sidebar (About, Releases, Packages, Languages) */}
+              <div className="lg:col-span-3">
+                <GitHubSidebar
+                  totalCount={stats.total}
+                  uniqueUsers={stats.uniqueUsers}
+                />
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
       {/* 4. GitHub Footer */}
       <footer className="border-t border-[#d0d7de] py-8 px-4 text-xs text-[#57606a] mt-12 bg-white">
@@ -216,19 +264,23 @@ export function App() {
       <GitGoCloneModal
         isOpen={isCloneModalOpen}
         onClose={() => setIsCloneModalOpen(false)}
-        onSuccess={() => {
+        onSuccess={(repoName?: string) => {
+          if (repoName) {
+            setCurrentRepo(repoName);
+          }
+          fetchRepositories();
           fetchData();
         }}
       />
 
-      {/* GitHub Copilot AI Floating Assistant & Security Shield */}
+      {/* Floating Copilot Widget */}
       <GitHubCopilotWidget />
 
-      {/* Image Preview Modal */}
+      {/* Big Image Preview Modal */}
       <ImageModal
-        isOpen={Boolean(modalImage)}
+        isOpen={!!modalImage}
         onClose={() => setModalImage(null)}
-        imageUrl={modalImage}
+        imageUrl={modalImage || ""}
         title={modalTitle}
       />
     </div>

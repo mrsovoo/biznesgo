@@ -55,6 +55,7 @@ router.post("/clone/scan", async (req, res) => {
         console.error(`URL klonlashda xato (${targetUrl}):`, err.message);
         reports.push({
           url: targetUrl,
+          repoName: "error-repo",
           totalFound: 0,
           addedCount: 0,
           skippedCount: 0,

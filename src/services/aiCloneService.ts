@@ -8,14 +8,13 @@ import {
   Medicine,
 } from "./medicineService.js";
 import { recordCommit } from "./commitService.js";
+import { createRepository, deriveRepoNameFromUrl } from "./repositoryService.js";
 
 export interface CloneResultItem {
   name: string;
   unit: string;
   quantity: string;
   image_url: string | null;
-  category: string;
-  description: string;
   status: "added" | "skipped";
   reason?: string;
   savedMedicine?: Medicine;
@@ -23,6 +22,7 @@ export interface CloneResultItem {
 
 export interface CloneReport {
   url: string;
+  repoName: string;
   totalFound: number;
   addedCount: number;
   skippedCount: number;
@@ -41,7 +41,11 @@ export async function cloneMedicinesFromUrl(
     );
   }
 
-  // 1. Fetch webpage HTML
+  // 1. Create or ensure Repository for this website exists
+  const repoName = deriveRepoNameFromUrl(pageUrl);
+  await createRepository(repoName, pageUrl, `${repoName} dan klonlangan katalog`);
+
+  // 2. Fetch webpage HTML
   let html = "";
   try {
     const res = await axios.get(pageUrl, {
@@ -57,16 +61,20 @@ export async function cloneMedicinesFromUrl(
     throw new Error(`Saytni ochib bo'lmadi (${pageUrl}): ${err.message}`);
   }
 
-  // 2. Parse HTML and gather images & readable text with Cheerio
+  // 3. Parse HTML and gather images & readable text with Cheerio
   const $ = cheerio.load(html);
 
   // Remove scripts, styles, iframes
   $("script, style, noscript, svg, nav, footer, header").remove();
 
-  // Extract all valid image URLs
+  // Extract all valid image URLs (product photos)
   const imageUrls: string[] = [];
   $("img").each((_, el) => {
-    const src = $(el).attr("src") || $(el).attr("data-src");
+    const src =
+      $(el).attr("src") ||
+      $(el).attr("data-src") ||
+      $(el).attr("data-lazy-src") ||
+      $(el).attr("data-original");
     if (src && !src.startsWith("data:") && !src.includes("icon") && !src.includes("logo")) {
       try {
         const fullUrl = new URL(src, pageUrl).href;
@@ -84,46 +92,41 @@ export async function cloneMedicinesFromUrl(
     .text()
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 30000); // Send up to 30,000 characters to Gemini
+    .slice(0, 30000);
 
-  if (!bodyText || bodyText.length < 50) {
+  if (!bodyText || bodyText.length < 30) {
     throw new Error("Saytdan dori ma'lumotlarini o'qib bo'lmadi (matn juda qisqa yoki bo'sh).");
   }
 
-  // 3. Call Gemini (with automatic fallback: 3.8-flash -> 3.5-flash-lite -> 3.1-flash-lite)
+  // 4. Call Gemini - only extract Name, Unit, Quantity, and Image URL (no descriptions, blazing fast!)
   const aiClient = new GoogleGenAI({ apiKey });
 
   const prompt = `
-You are an expert pharmacology data extractor specializing in veterinary and agricultural (vet & agro) medicines.
-Analyze the following webpage content and list of product images:
-
+Extract all veterinary and agricultural (vet & agro) medicine products from this webpage:
 URL: ${pageUrl}
-Discovered product images: ${JSON.stringify(imageUrls.slice(0, 40))}
 
-Webpage text:
+Product images found on page:
+${JSON.stringify(imageUrls.slice(0, 50))}
+
+Page text:
 """
 ${bodyText}
 """
 
 Task:
-Extract all distinct medicine/drug products found on this page.
-For each medicine:
-- "name": Clean official brand/trade name (e.g. 'Enroflon 10%', 'Biovit-80', 'Ivermektin', 'Oksitetratsiklin 20%').
-- "unit": Exact measurement unit, MUST BE ONE OF: "litr", "ml", "kg", "gramm", or "dona".
-- "quantity": Standard package size or dosage number (e.g. '1', '100', '500', '10', '2.5').
-- "image_url": The most matching full image URL from the discovered product images list, or null if no matching image.
-- "category": One of "antibiotik", "vitamin", "antiparazitar", "agroximikat", "vaksina", "dezinfeksiya", "boshqa".
-- "description": 1 concise sentence in Uzbek or Russian explaining what the drug treats or how it is used.
+Extract each medicine. ONLY return these 4 fields (NO descriptions, NO bloat):
+- "name": Clean brand or trade name (e.g. 'Enroflon 10%', 'Biovit-80', 'Ivermektin', 'Oksitetratsiklin').
+- "unit": MUST be strictly one of: "litr", "ml", "kg", "gramm", "dona".
+- "quantity": Number (e.g. '1', '100', '500', '10').
+- "image_url": Full valid image URL from the product images list that matches this medicine, or null.
 
-Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra commentary):
+Respond ONLY with raw JSON array:
 [
   {
     "name": "...",
     "unit": "litr",
     "quantity": "1",
-    "image_url": "...",
-    "category": "antibiotik",
-    "description": "..."
+    "image_url": "..."
   }
 ]
 `;
@@ -134,12 +137,16 @@ Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra 
 
   for (const model of candidateModels) {
     try {
-      const interaction = await aiClient.interactions.create({
+      const res = await aiClient.models.generateContent({
         model,
-        input: prompt,
+        contents: prompt,
+        config: {
+          maxOutputTokens: 1000,
+          temperature: 0.2,
+        },
       });
 
-      const responseText = interaction.output_text || "";
+      const responseText = res.text || "";
       const cleanJson = responseText
         .replace(/^```json\s*/i, "")
         .replace(/^```\s*/i, "")
@@ -147,31 +154,38 @@ Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra 
         .trim();
 
       extractedList = JSON.parse(cleanJson);
-      if (Array.isArray(extractedList)) {
-        break; // Successfully extracted
+      if (Array.isArray(extractedList) && extractedList.length > 0) {
+        break;
       }
     } catch (err: any) {
-      console.warn(`Model ${model} vaqtincha javob bermadi, navbatdagi modelga o'tilmoqda:`, err.message);
+      console.warn(`Model ${model} xatosi:`, err.message);
       lastError = err;
     }
   }
 
   if (!Array.isArray(extractedList) || extractedList.length === 0) {
-    if (lastError && (!extractedList || extractedList.length === 0)) {
-      console.error("Barcha Gemini modellari xatolik berdi:", lastError);
-      throw new Error(`Gemini AI bilan tahlil qilishda xatolik: ${lastError.message}`);
+    if (lastError) {
+      throw new Error(`Gemini AI tahlilida xatolik: ${lastError.message}`);
     }
+    extractedList = [];
   }
 
-  // 4. Deduplicate against Neon PostgreSQL database
+  // 5. Deduplicate and Save to Neon PostgreSQL database under the site's repository
   const reportItems: CloneResultItem[] = [];
   let addedCount = 0;
   let skippedCount = 0;
 
-  for (const item of extractedList) {
+  for (let i = 0; i < extractedList.length; i++) {
+    const item = extractedList[i];
     if (!item.name || !item.unit) continue;
 
     const existing = await findMedicineByName(item.name, item.unit);
+
+    // If no matching image was selected, assign from available page images
+    let resolvedImage = item.image_url;
+    if (!resolvedImage && imageUrls.length > 0) {
+      resolvedImage = imageUrls[i % imageUrls.length];
+    }
 
     if (existing) {
       skippedCount++;
@@ -179,51 +193,42 @@ Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra 
         name: item.name,
         unit: item.unit.toLowerCase(),
         quantity: String(item.quantity || "1"),
-        image_url: item.image_url || null,
-        category: item.category || "boshqa",
-        description: item.description || "",
+        image_url: resolvedImage || null,
         status: "skipped",
         reason: `Bazada allaqachon mavjud (ID: #${existing.id})`,
       });
     } else {
       addedCount++;
       const saved = await createMedicine({
-        telegram_user_id: 1000000, // System AI Clone user
+        telegram_user_id: 1000000,
         telegram_username: "ai_clone_gemini",
         name: item.name,
         unit: item.unit.toLowerCase(),
         quantity: String(item.quantity || "1"),
-        photo_file_id: item.image_url || "external_web_clone",
-        photo_url: item.image_url || null,
-        description: item.description || null,
+        photo_file_id: resolvedImage || "external_web_clone",
+        photo_url: resolvedImage || null,
         source_url: pageUrl,
-        category: item.category || "boshqa",
+        category: "agro_vet",
+        repository: repoName,
       });
 
       reportItems.push({
         name: item.name,
         unit: item.unit.toLowerCase(),
         quantity: String(item.quantity || "1"),
-        image_url: item.image_url || null,
-        category: item.category || "boshqa",
-        description: item.description || "",
+        image_url: resolvedImage || null,
         status: "added",
         savedMedicine: saved,
       });
     }
   }
 
-  // Auto-record commit for GitGo / GitHub commit strip
+  // Record Git commit under the repository name
   try {
-    let hostname = pageUrl;
-    try {
-      hostname = new URL(pageUrl).hostname;
-    } catch {}
-
     const commitMessage =
       addedCount > 0
-        ? `feat(clone): import ${addedCount} medications from ${hostname} (${skippedCount} duplicates skipped)`
-        : `chore(clone): scanned ${hostname} — all ${skippedCount} items already exist in database`;
+        ? `feat(${repoName}): clone ${addedCount} medications with photos (${skippedCount} duplicates skipped)`
+        : `chore(${repoName}): scan ${repoName} — all ${skippedCount} items already exist in database`;
 
     await recordCommit({
       author: "ai-clone[bot]",
@@ -231,6 +236,7 @@ Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra 
       message: commitMessage,
       details: {
         url: pageUrl,
+        repoName,
         addedCount,
         skippedCount,
         totalFound: extractedList.length,
@@ -242,6 +248,7 @@ Respond with ONLY valid raw JSON array of objects (no markdown fences, no extra 
 
   return {
     url: pageUrl,
+    repoName,
     totalFound: extractedList.length,
     addedCount,
     skippedCount,

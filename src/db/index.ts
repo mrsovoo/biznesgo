@@ -51,8 +51,21 @@ export async function initDb() {
       ALTER TABLE medicines ADD COLUMN IF NOT EXISTS description TEXT;
       ALTER TABLE medicines ADD COLUMN IF NOT EXISTS source_url TEXT;
       ALTER TABLE medicines ADD COLUMN IF NOT EXISTS category VARCHAR(100);
+      ALTER TABLE medicines ADD COLUMN IF NOT EXISTS repository VARCHAR(100) DEFAULT 'biznesgo';
       CREATE INDEX IF NOT EXISTS idx_medicines_user_id ON medicines(telegram_user_id);
       CREATE INDEX IF NOT EXISTS idx_medicines_created_at ON medicines(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_medicines_repository ON medicines(repository);
+
+      CREATE TABLE IF NOT EXISTS repositories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        source_url TEXT,
+        description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO repositories (name, description)
+      VALUES ('biznesgo', 'Markaziy farmakologiya master katalogi')
+      ON CONFLICT (name) DO NOTHING;
 
       CREATE TABLE IF NOT EXISTS commits (
         id SERIAL PRIMARY KEY,

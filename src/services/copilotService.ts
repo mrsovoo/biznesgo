@@ -166,18 +166,19 @@ export async function runCopilotChat(data: {
       const report = await cloneMedicinesFromUrl(targetUrl, apiKey);
       const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
 
-      let reply = `✅ **Saytdan dori vositalari muvaffaqiyatli klonlandi!**\n\n`;
-      reply += `🔗 **Sayt:** \`${targetUrl}\`\n`;
+      let reply = `✅ **${report.repoName}** repozitoriyasi ochildi va dorilar klonlandi!\n\n`;
+      reply += `📁 **Repozitoriy:** \`sohibjonsulaymonov/${report.repoName}\`\n`;
+      reply += `🔗 **Manba:** ${targetUrl}\n`;
       reply += `📦 **Jami topildi:** ${report.totalFound} ta dori\n`;
-      reply += `✨ **Yangi qo'shildi:** ${report.addedCount} ta\n`;
+      reply += `✨ **Rasmi va nomi bilan qo'shildi:** ${report.addedCount} ta\n`;
       reply += `⏭️ **Allaqachon mavjud:** ${report.skippedCount} ta\n\n`;
 
       if (report.addedCount > 0) {
-        reply += `Barcha yangi dorilar fotosurati, o'lchov birligi (litr, ml, kg, dona) va miqdori bilan bazaga qo'shildi hamda GitHub commit qilindi!`;
+        reply += `Barcha dorilar o'zining asl fotosurati, nomi va turi (litr, ml, kg, dona) bo'yicha papkalarga joylandi!`;
       } else if (report.totalFound > 0) {
-        reply += `Ushbu sahifadagi hamma dorilar allaqachon bazamizda bor ekan, shuning uchun takroriy qo'shilmadi.`;
+        reply += `Ushbu sahifadagi hamma dorilar allaqachon bazamizda mavjud ekan.`;
       } else {
-        reply += `Saytdan aniq dori mahsulotlari topilmadi. Iltimos, dori katalogi yoki mahsulotlar sahifasi havolasini bering.`;
+        reply += `Saytdan aniq dori mahsulotlari topilmadi. Iltimos, dori katalogi havolasini bering.`;
       }
 
       return {
@@ -186,14 +187,14 @@ export async function runCopilotChat(data: {
         refreshData: true,
         durationSeconds,
         thoughts: [
-          `Havola aniqlandi: ${targetUrl}`,
-          `HTML va fotosuratlar yuklab olindi`,
-          `Gemini AI dori vositalarini ajratib oldi (${report.totalFound} ta)`,
-          `Neon PostgreSQL bazasida dublikatlar tekshirildi`,
-          `${report.addedCount} ta yangi dori bazaga kiritildi va commit qilindi`,
+          `Yangi repozitoriy yaratildi: ${report.repoName}`,
+          `Sayt sahifasi va fotosuratlari yuklab olindi`,
+          `Gemini AI faqat dori rasmi, nomi va o'lchov birligini ajratib oldi`,
+          `Neon PostgreSQL bazasiga kiritildi va Git commit qilindi`,
         ],
         data: {
           report,
+          repoName: report.repoName,
         },
       };
     } catch (err: any) {

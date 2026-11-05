@@ -9,8 +9,51 @@ import {
   getFolderCommits,
   getAllCommits,
 } from "../services/commitService.js";
+import {
+  getAllRepositories,
+  createRepository,
+  deleteRepository,
+} from "../services/repositoryService.js";
 
 const router = Router();
+
+// GET all repositories (for left sidebar)
+router.get("/repositories", async (req, res) => {
+  try {
+    const repos = await getAllRepositories();
+    res.json({ success: true, data: repos });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST create repository
+router.post("/repositories", async (req, res) => {
+  try {
+    const { name, sourceUrl, description } = req.body;
+    if (!name || typeof name !== "string") {
+      return res.status(400).json({ success: false, message: "Repozitoriy nomi kiritilishi shart." });
+    }
+    const repo = await createRepository(name, sourceUrl, description);
+    res.json({ success: true, data: repo });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE repository
+router.delete("/repositories/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const ok = await deleteRepository(name);
+    if (!ok) {
+      return res.status(400).json({ success: false, message: "Ushbu repozitoriyni o'chirib bo'lmaydi." });
+    }
+    res.json({ success: true, message: "Repozitoriy muvaffaqiyatli o'chirildi." });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // GET commits history
 router.get("/commits", async (req, res) => {
@@ -55,10 +98,11 @@ router.get("/commits", async (req, res) => {
 // GET all medicines
 router.get("/medicines", async (req, res) => {
   try {
-    const { search, unit } = req.query;
+    const { search, unit, repository } = req.query;
     const medicines = await getAllMedicines({
       search: search ? String(search) : undefined,
       unit: unit ? String(unit) : undefined,
+      repository: repository ? String(repository) : undefined,
     });
     res.json({ success: true, data: medicines });
   } catch (error: any) {
@@ -69,7 +113,8 @@ router.get("/medicines", async (req, res) => {
 // GET stats
 router.get("/stats", async (req, res) => {
   try {
-    const stats = await getStats();
+    const { repository } = req.query;
+    const stats = await getStats(repository ? String(repository) : undefined);
     res.json({ success: true, data: stats });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

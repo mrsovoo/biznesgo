@@ -13,6 +13,7 @@ export interface Medicine {
   description?: string | null;
   source_url?: string | null;
   category?: string | null;
+  repository?: string | null;
   created_at: string;
 }
 
@@ -27,6 +28,7 @@ export interface CreateMedicineDto {
   description?: string | null;
   source_url?: string | null;
   category?: string | null;
+  repository?: string | null;
 }
 
 // In-memory fallback if database is not connected yet during testing
@@ -60,6 +62,7 @@ export async function findMedicineByName(name: string, unit?: string): Promise<M
 
 export async function createMedicine(data: CreateMedicineDto): Promise<Medicine> {
   const db = getDbPool();
+  const repoName = (data.repository || "biznesgo").trim().toLowerCase();
   try {
     const res = await db.query<Medicine>(
       `INSERT INTO medicines (
@@ -72,9 +75,10 @@ export async function createMedicine(data: CreateMedicineDto): Promise<Medicine>
         photo_url,
         description,
         source_url,
-        category
+        category,
+        repository
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         data.telegram_user_id,
@@ -87,14 +91,15 @@ export async function createMedicine(data: CreateMedicineDto): Promise<Medicine>
         data.description || null,
         data.source_url || null,
         data.category || null,
+        repoName,
       ]
     );
     const newMed = res.rows[0];
     await recordCommit({
-      message: `feat(catalog): add ${newMed.name} (${newMed.quantity} ${newMed.unit})`,
+      message: `feat(${repoName}): add ${newMed.name} (${newMed.quantity} ${newMed.unit})`,
       author: newMed.telegram_username ? `@${newMed.telegram_username}` : String(newMed.telegram_user_id),
       folder: newMed.unit.toLowerCase(),
-      details: { medicineId: newMed.id, action: "add" },
+      details: { medicineId: newMed.id, action: "add", repository: repoName },
     }).catch(() => {});
     return newMed;
   } catch (err) {
@@ -111,6 +116,7 @@ export async function createMedicine(data: CreateMedicineDto): Promise<Medicine>
       description: data.description || null,
       source_url: data.source_url || null,
       category: data.category || null,
+      repository: repoName,
       created_at: new Date().toISOString(),
     };
     memoryStore.unshift(item);
@@ -121,12 +127,18 @@ export async function createMedicine(data: CreateMedicineDto): Promise<Medicine>
 export async function getAllMedicines(query?: {
   search?: string;
   unit?: string;
+  repository?: string;
 }): Promise<Medicine[]> {
   const db = getDbPool();
   try {
     let sql = `SELECT * FROM medicines`;
     const params: any[] = [];
     const conditions: string[] = [];
+
+    if (query?.repository && query.repository !== "all") {
+      params.push(query.repository.trim().toLowerCase());
+      conditions.push(`LOWER(repository) = $${params.length}`);
+    }
 
     if (query?.search) {
       params.push(`%${query.search.trim()}%`);
@@ -149,6 +161,9 @@ export async function getAllMedicines(query?: {
   } catch (err) {
     console.warn("Bazadan o'qishda xatolik, xotiradagi ma'lumotlar qaytariladi:", err);
     let list = [...memoryStore];
+    if (query?.repository && query.repository !== "all") {
+      list = list.filter((m) => (m.repository || "biznesgo").toLowerCase() === query.repository?.toLowerCase());
+    }
     if (query?.search) {
       const s = query.search.toLowerCase();
       list = list.filter(
@@ -188,8 +203,8 @@ export async function deleteMedicine(id: number): Promise<boolean> {
   }
 }
 
-export async function getStats() {
-  const medicines = await getAllMedicines();
+export async function getStats(repository?: string) {
+  const medicines = await getAllMedicines({ repository });
   const total = medicines.length;
   const uniqueUsers = new Set(medicines.map((m) => m.telegram_user_id)).size;
 

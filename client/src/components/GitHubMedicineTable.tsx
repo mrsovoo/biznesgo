@@ -317,52 +317,24 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                         </p>
                       </td>
                     </tr>
-                  ) : viewMode === "files" ? (
-                    /* Files view: looks like code files in GitHub */
+                  ) : (
+                    /* Medicine List with Real Photo, Name, and Unit */
                     folderMedicines.map((item) => {
                       const fileName = `${item.name.toLowerCase().replace(/\s+/g, "_")}_${item.quantity}${item.unit}.json`;
                       const dateObj = new Date(item.created_at);
+                      const imageUrl = item.photo_url || `/api/images/telegram/${item.photo_file_id}`;
 
                       return (
                         <tr
                           key={item.id}
-                          onClick={() => onSelectMedicine(item)}
-                          className="hover:bg-[#f6f8fa] transition-colors cursor-pointer group"
+                          className="hover:bg-[#f6f8fa] transition-colors group"
                         >
-                          <td className="py-2.5 px-4 w-12 text-[#57606a]">
-                            <FileCode className="w-4 h-4 text-[#0969da]" />
-                          </td>
-                          <td className="py-2.5 px-4 font-semibold text-[#0969da] group-hover:underline w-1/3">
-                            {fileName}
-                          </td>
-                          <td className="py-2.5 px-4 text-[#57606a] truncate">
-                            <span className="text-[#24292f] font-medium mr-2">{item.name}</span>
-                            <span className="bg-[#ddf4ff] text-[#0969da] text-[10px] px-1.5 py-0.2 rounded font-semibold mr-2">
-                              {item.quantity} {item.unit}
-                            </span>
-                            <span className="text-[11px] text-[#8c959f]">
-                              Author: @{item.telegram_username || item.telegram_user_id}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a] whitespace-nowrap">
-                            {dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    /* Inspector Table Mode with thumbnails */
-                    folderMedicines.map((item) => {
-                      const imageUrl = item.photo_url || `/api/images/telegram/${item.photo_file_id}`;
-                      return (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-[#f6f8fa] transition-colors"
-                        >
-                          <td className="py-2 px-4 w-12">
+                          {/* Photo Thumbnail */}
+                          <td className="py-2 px-3 w-12">
                             <div
                               onClick={() => onViewImage(imageUrl, item.name)}
-                              className="w-8 h-8 rounded bg-[#f6f8fa] border border-[#d0d7de] overflow-hidden cursor-pointer flex items-center justify-center"
+                              className="w-10 h-10 rounded-md bg-[#f6f8fa] border border-[#d0d7de] overflow-hidden cursor-pointer flex items-center justify-center shrink-0 hover:ring-2 hover:ring-[#0969da]/40 transition shadow-2xs"
+                              title="Rasmni kattalashtirish"
                             >
                               <img
                                 src={imageUrl}
@@ -374,31 +346,43 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                               />
                             </div>
                           </td>
+
+                          {/* Name & File tag */}
                           <td
                             onClick={() => onSelectMedicine(item)}
-                            className="py-2.5 px-4 font-semibold text-[#0969da] hover:underline cursor-pointer"
+                            className="py-2.5 px-3 font-semibold text-[#0969da] group-hover:underline cursor-pointer"
                           >
-                            {item.name}
-                            <span className="text-[10px] text-[#8c959f] ml-1.5 font-mono">#{item.id}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                              <span className="text-xs text-[#1f2328] font-bold">{item.name}</span>
+                              <span className="text-[10px] text-[#57606a] font-mono bg-[#f6f8fa] px-1.5 py-0.2 rounded border border-[#d0d7de]/60 w-fit mt-0.5 sm:mt-0">
+                                {fileName}
+                              </span>
+                            </div>
                           </td>
-                          <td className="py-2.5 px-4">
-                            <span className="font-bold text-[#24292f] mr-1.5">{item.quantity}</span>
-                            <span className="text-[10px] bg-[#dafbe1] text-[#1a7f37] border border-[#4ac26b]/40 px-1.5 py-0.5 rounded font-semibold">
-                              {item.unit}
+
+                          {/* Unit & Quantity Badge */}
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#ddf4ff] text-[#0969da] border border-[#54aeff]/30">
+                              {item.quantity} {item.unit}
                             </span>
                           </td>
-                          <td className="py-2.5 px-4 text-right">
-                            <button
-                              onClick={() => {
-                                if (confirm(`Dorini o'chirmoqchimisiz: ${item.name}?`)) {
-                                  onDelete(item.id);
-                                }
-                              }}
-                              className="text-[#57606a] hover:text-[#cf222e] p-1 rounded hover:bg-[#ffebe9] transition"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+
+                          {/* Time & Delete */}
+                          <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a] whitespace-nowrap">
+                            <div className="flex items-center justify-end space-x-2">
+                              <span>{dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Dorini o'chirmoqchimisiz: ${item.name}?`)) {
+                                    onDelete(item.id);
+                                  }
+                                }}
+                                className="text-[#57606a] hover:text-[#cf222e] p-1 rounded hover:bg-[#ffebe9] transition"
+                                title="O'chirish"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

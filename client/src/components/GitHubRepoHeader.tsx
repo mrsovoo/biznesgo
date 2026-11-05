@@ -18,6 +18,7 @@ interface GitHubRepoHeaderProps {
   setActiveTab: (tab: "code" | "medicines" | "insights") => void;
   medicineCount: number;
   onOpenClone: () => void;
+  currentRepo?: string;
 }
 
 export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
@@ -25,6 +26,7 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
   setActiveTab,
   medicineCount,
   onOpenClone,
+  currentRepo = "biznesgo",
 }) => {
   return (
     <div className="bg-[#f6f8fa] border-b border-[#d0d7de] pt-5 px-4 sm:px-8">
@@ -44,7 +46,7 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
               href="#"
               className="text-[#0969da] hover:underline font-bold"
             >
-              biznesgo
+              {currentRepo}
             </a>
             <span className="text-[11px] font-medium text-[#57606a] border border-[#d0d7de] rounded-full px-2 py-0.5 ml-2 bg-white">
               Public
