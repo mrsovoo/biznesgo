@@ -15,6 +15,14 @@ export function getDbPool(): pg.Pool {
       ssl: config.databaseUrl.includes("localhost")
         ? false
         : { rejectUnauthorized: false },
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+      max: 10,
+    });
+
+    // Handle idle connection errors gracefully (especially critical for Neon serverless pooler)
+    pool.on("error", (err) => {
+      console.warn("⚠️ PostgreSQL idle connection notice:", err.message);
     });
   }
   return pool;
