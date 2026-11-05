@@ -205,7 +205,7 @@ export const GitHubRepositoriesDashboard: React.FC<GitHubRepositoriesDashboardPr
         {/* Repository Items List */}
         <div className="divide-y divide-[#d0d7de]/70">
           {filteredRepos.map((repo) => {
-            const isMaster = repo.name === "biznesgo";
+            const isMaster = repo.name === "biznesgo" || repo.name === "tbovet" || repo.name === repositories[0]?.name;
             const repoTitle = `mrsovoo / ${repo.name}`;
             const desc =
               repo.description ||

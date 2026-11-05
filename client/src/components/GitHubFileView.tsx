@@ -16,6 +16,7 @@ interface GitHubFileViewProps {
   onBack: () => void;
   onDelete: (id: number) => void;
   onViewImage: (url: string, name: string) => void;
+  currentRepo?: string;
 }
 
 export const GitHubFileView: React.FC<GitHubFileViewProps> = ({
@@ -23,11 +24,12 @@ export const GitHubFileView: React.FC<GitHubFileViewProps> = ({
   onBack,
   onDelete,
   onViewImage,
+  currentRepo = "biznesgo",
 }) => {
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [copied, setCopied] = useState(false);
 
-  const imageUrl = `/api/images/telegram/${medicine.photo_file_id}`;
+  const imageUrl = medicine.photo_url || `/api/images/telegram/${medicine.photo_file_id}`;
   const fileName = `${medicine.name.toLowerCase().replace(/\s+/g, "_")}_${medicine.quantity}${medicine.unit}.json`;
 
   const jsonContent = JSON.stringify(
@@ -70,7 +72,7 @@ export const GitHubFileView: React.FC<GitHubFileViewProps> = ({
             className="flex items-center space-x-1 text-[#0969da] hover:underline cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>biznesgo</span>
+            <span>{currentRepo}</span>
           </button>
           <span className="text-[#57606a]">/</span>
           <span className="text-[#0969da] cursor-pointer" onClick={onBack}>

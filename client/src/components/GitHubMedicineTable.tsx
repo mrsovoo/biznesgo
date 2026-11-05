@@ -26,6 +26,7 @@ interface GitHubMedicineTableProps {
   onOpenClone: () => void;
   latestCommit?: Commit | null;
   folderCommits?: Record<string, Commit>;
+  currentRepo?: string;
 }
 
 export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
@@ -40,6 +41,7 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
   onOpenClone,
   latestCommit,
   folderCommits = {},
+  currentRepo = "biznesgo",
 }) => {
   // Units breakdown
   const unitCounts: Record<string, number> = {};
@@ -101,7 +103,7 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
               onClick={() => setCurrentFolder(null)}
               className="text-[#0969da] hover:underline"
             >
-              biznesgo
+              {currentRepo}
             </button>
             {currentFolder && (
               <>

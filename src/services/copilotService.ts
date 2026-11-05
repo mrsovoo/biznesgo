@@ -9,7 +9,7 @@ import {
   getStats,
   Medicine,
 } from "./medicineService.js";
-import { deleteRepository, getAllRepositories } from "./repositoryService.js";
+import { deleteRepository, getAllRepositories, renameRepository } from "./repositoryService.js";
 import { cloneMedicinesFromUrl } from "./aiCloneService.js";
 import { getLatestCommit, getAllCommits, recordCommit } from "./commitService.js";
 import { getDbPool } from "../db/index.js";
@@ -394,6 +394,48 @@ export async function runCopilotChat(data: {
           ],
         };
       }
+    }
+  }
+
+  // F. Rename Repository Intent (e.g. "biznesgo dib nomlagan repo nomini tbovet dib nomla", "biznesgo reponi tbovet qil")
+  const isRenameIntent =
+    (lowerMsg.includes("nomla") || lowerMsg.includes("nomini") || lowerMsg.includes("o'zgartir") || lowerMsg.includes("ozgartir") || lowerMsg.includes("almashtir") || lowerMsg.includes("qil")) &&
+    (lowerMsg.includes("repo") || lowerMsg.includes("nom"));
+
+  if (isRenameIntent) {
+    const match1 = userMsg.match(/([a-zA-Z0-9_-]+)\s*(?:deb|dib)?\s*(?:nomlangan|nomlagan|nomli)?\s*(?:repo|repozitoriy)?\s*(?:nomini|ni)?\s*([a-zA-Z0-9_-]+)\s*(?:deb|dib|ga)?\s*(?:nomla|o['’`]?zgartir|ozgartir|almashtir|qil)/i);
+    const match2 = userMsg.match(/(?:repo|repozitoriy)\s*(?:nomini)?\s*([a-zA-Z0-9_-]+)\s*(?:deb|dib|ga)?\s*(?:nomla|o['’`]?zgartir|ozgartir|almashtir|qil)/i);
+
+    let oldTarget = activeRepo;
+    let newTarget = "";
+
+    if (match1 && match1[1] && match1[2] && !["repo", "repozitoriy", "nomini", "nomi", "barcha"].includes(match1[1].toLowerCase())) {
+      oldTarget = match1[1].trim().toLowerCase();
+      newTarget = match1[2].trim().toLowerCase();
+    } else if (match2 && match2[1]) {
+      newTarget = match2[1].trim().toLowerCase();
+    }
+
+    newTarget = newTarget.replace(/^(deb|dib|ga|ni)/, "").trim();
+
+    if (newTarget && newTarget !== oldTarget) {
+      const success = await renameRepository(oldTarget, newTarget);
+      const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+      return {
+        reply: `✏️ **Repozitoriy nomi o'zgartirildi!**\n\n'**${oldTarget}**' repozitoriyasi va unga tegishli barcha dorilar muvaffaqiyatli '**${newTarget}**' deb qayta nomlandi.\n\nEndi saytda barcha joyda: \`mrsovoo / ${newTarget}\` ko'rinishida bo'ladi!`,
+        actionTaken: "RENAME_REPO_COMPLETED",
+        refreshData: true,
+        durationSeconds,
+        thoughts: [
+          `Repozitoriy qayta nomlash: ${oldTarget} -> ${newTarget}`,
+          `Baza va dorilar jadvallaridagi repository ustuni yangilandi`,
+          `Yangi nom o'rnatildi: mrsovoo / ${newTarget}`,
+        ],
+        data: {
+          oldRepo: oldTarget,
+          newRepo: newTarget,
+        },
+      };
     }
   }
 

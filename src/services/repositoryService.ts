@@ -18,9 +18,16 @@ export function deriveRepoNameFromUrl(url: string): string {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.replace(/^www\./, "");
-    const namePart = host.split(".")[0] || "cloned-repo";
-    const tld = host.split(".")[1] || "uz";
-    return `${namePart}-${tld}`.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+    // Extract clean name directly before .com / .uz / .org / etc.
+    // e.g. https://tbovet.com/products -> tbovet
+    // e.g. https://agroz.uz -> agroz
+    // e.g. https://shop.tbovet.com -> tbovet
+    const parts = host.split(".");
+    let namePart = parts[0];
+    if (parts.length > 2 && ["shop", "catalog", "app", "store", "m"].includes(parts[0].toLowerCase())) {
+      namePart = parts[1];
+    }
+    return namePart.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
   } catch {
     return "cloned-repo";
   }
@@ -70,13 +77,44 @@ export async function createRepository(name: string, sourceUrl?: string, descrip
 }
 
 export async function deleteRepository(name: string): Promise<boolean> {
-  if (name === "biznesgo") return false; // Prevent deleting master
   const db = getDbPool();
   try {
     await db.query(`DELETE FROM medicines WHERE repository = $1`, [name]);
     await db.query(`DELETE FROM repositories WHERE name = $1`, [name]);
     return true;
   } catch {
+    return false;
+  }
+}
+
+export async function renameRepository(oldName: string, newName: string): Promise<boolean> {
+  const db = getDbPool();
+  const cleanOld = oldName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  const cleanNew = newName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  if (!cleanOld || !cleanNew || cleanOld === cleanNew) return false;
+
+  try {
+    // 1. Ensure target new repo exists
+    await db.query(`
+      INSERT INTO repositories (name, description)
+      VALUES ($1, 'Qayta nomlangan repozitoriy')
+      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+    `, [cleanNew]);
+
+    // 2. Transfer all medicines from old repo to new repo
+    await db.query(`UPDATE medicines SET repository = $1 WHERE LOWER(repository) = $2`, [cleanNew, cleanOld]);
+
+    // 3. Remove old repo
+    await db.query(`DELETE FROM repositories WHERE LOWER(name) = $1`, [cleanOld]);
+
+    return true;
+  } catch (err: any) {
+    console.warn("renameRepository xatosi:", err.message);
+    const oldIdx = memoryRepos.findIndex((r) => r.name.toLowerCase() === cleanOld);
+    if (oldIdx !== -1) {
+      memoryRepos[oldIdx].name = cleanNew;
+      return true;
+    }
     return false;
   }
 }

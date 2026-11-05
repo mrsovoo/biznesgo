@@ -40,8 +40,15 @@ export function App() {
   const fetchRepositories = useCallback(async () => {
     try {
       const res = await axios.get("/api/repositories");
-      if (res.data.success) {
+      if (res.data.success && res.data.data.length > 0) {
         setRepositories(res.data.data);
+        setCurrentRepo((prev) => {
+          const exists = res.data.data.some((r: any) => r.name === prev);
+          if (!exists) {
+            return res.data.data[0].name;
+          }
+          return prev;
+        });
       }
     } catch (err) {
       console.error("Repozitoriyalarni yuklashda xato:", err);
@@ -206,6 +213,7 @@ export function App() {
                 onBack={() => setSelectedMedicine(null)}
                 onDelete={handleDelete}
                 onViewImage={handleViewImage}
+                currentRepo={currentRepo}
               />
             ) : (
               /* Repository Directory View + Right Sidebar */
@@ -223,6 +231,7 @@ export function App() {
                     onOpenClone={() => setIsCloneModalOpen(true)}
                     latestCommit={latestCommit}
                     folderCommits={folderCommits}
+                    currentRepo={currentRepo}
                   />
 
                   {/* Folder-specific or Root README.md box below */}
