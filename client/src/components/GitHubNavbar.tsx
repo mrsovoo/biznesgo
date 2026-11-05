@@ -80,27 +80,6 @@ export const GitHubNavbar: React.FC<GitHubNavbarProps> = ({
       </div>
 
       <div className="flex items-center space-x-2">
-        {/* Clone button styled as GitHub's green button */}
-        <button
-          onClick={onOpenClone}
-          className="flex items-center space-x-1.5 bg-[#238636] hover:bg-[#2ea043] border border-[rgba(240,246,252,0.1)] text-white text-xs font-semibold px-2.5 py-1 rounded-md transition shadow-xs"
-          title="Clone website inventory via Gemini AI"
-        >
-          <span className="font-mono text-[11px]">&lt;&gt;</span>
-          <span>Code / Clone</span>
-        </button>
-
-        {/* Reset Bot Menu Button */}
-        <button
-          onClick={onResetBot}
-          disabled={resetting}
-          title="Botning eski 'Launch App' va menyusini tozalash"
-          className="flex items-center space-x-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#e6edf3] text-xs font-semibold px-2 py-1 rounded-md transition shadow-xs disabled:opacity-50"
-        >
-          <Terminal className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline">{resetting ? "Tozalanmoqda..." : "Reset Bot"}</span>
-        </button>
-
         {/* Notifications */}
         <button className="text-[#e6edf3] hover:text-white p-1 rounded-md hover:bg-[#30363d] transition relative">
           <Bell className="w-4 h-4" />

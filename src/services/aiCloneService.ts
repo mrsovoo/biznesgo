@@ -132,8 +132,49 @@ Respond ONLY with raw JSON array:
 `;
 
   let extractedList: any[] = [];
-  const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
+  const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
   let lastError: any = null;
+
+  function parseJsonArraySafe(text: string): any[] {
+    try {
+      const clean = text
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+
+    // Resilient repair: find last complete object closing brace '}'
+    try {
+      let fixed = text.trim();
+      const lastBrace = fixed.lastIndexOf("}");
+      if (lastBrace !== -1) {
+        fixed = fixed.slice(0, lastBrace + 1) + "]";
+        const firstBracket = fixed.indexOf("[");
+        if (firstBracket !== -1) {
+          fixed = fixed.slice(firstBracket);
+          const parsed = JSON.parse(fixed);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      }
+    } catch {}
+
+    // Match individual objects regex
+    const matches = text.match(/\{[^{}]*"name"[^{}]*\}/g);
+    if (matches) {
+      const items = [];
+      for (const m of matches) {
+        try {
+          const obj = JSON.parse(m);
+          if (obj.name) items.push(obj);
+        } catch {}
+      }
+      if (items.length > 0) return items;
+    }
+    return [];
+  }
 
   for (const model of candidateModels) {
     try {
@@ -141,19 +182,14 @@ Respond ONLY with raw JSON array:
         model,
         contents: prompt,
         config: {
-          maxOutputTokens: 1000,
-          temperature: 0.2,
+          maxOutputTokens: 4096,
+          temperature: 0.1,
+          responseMimeType: "application/json",
         },
       });
 
       const responseText = res.text || "";
-      const cleanJson = responseText
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-
-      extractedList = JSON.parse(cleanJson);
+      extractedList = parseJsonArraySafe(responseText);
       if (Array.isArray(extractedList) && extractedList.length > 0) {
         break;
       }
@@ -163,11 +199,34 @@ Respond ONLY with raw JSON array:
     }
   }
 
+  // Fallback: If AI model had quota/high-demand error, extract directly from HTML cards via Cheerio
   if (!Array.isArray(extractedList) || extractedList.length === 0) {
-    if (lastError) {
+    console.log("Gemini javob bermadi, Cheerio orqali HTML kartochkalaridan ajratib olinmoqda...");
+    const htmlCards: any[] = [];
+    $("[class*='product'], [class*='item'], .card, article").each((_, el) => {
+      const name = $(el).find("h2, h3, h4, .title, [class*='title'], [class*='name']").first().text().trim();
+      const img = $(el).find("img").first().attr("src") || $(el).find("img").first().attr("data-src");
+      if (name && name.length >= 2 && name.length <= 100 && !htmlCards.some((c) => c.name === name)) {
+        let fullImg: string | null = null;
+        if (img) {
+          try {
+            fullImg = new URL(img, pageUrl).href;
+          } catch {}
+        }
+        htmlCards.push({
+          name,
+          unit: name.toLowerCase().includes("litr") || name.toLowerCase().includes("1l") ? "litr" : name.toLowerCase().includes("kg") ? "kg" : "dona",
+          quantity: "1",
+          image_url: fullImg,
+        });
+      }
+    });
+
+    if (htmlCards.length > 0) {
+      extractedList = htmlCards.slice(0, 30);
+    } else if (lastError) {
       throw new Error(`Gemini AI tahlilida xatolik: ${lastError.message}`);
     }
-    extractedList = [];
   }
 
   // 5. Deduplicate and Save to Neon PostgreSQL database under the site's repository

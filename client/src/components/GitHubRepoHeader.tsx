@@ -54,16 +54,6 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 text-xs">
-            {/* GitHub green action button */}
-            <button
-              onClick={onOpenClone}
-              className="flex items-center space-x-1.5 bg-[#1f883d] hover:bg-[#1a7f37] border border-[rgba(31,35,40,0.15)] text-white font-semibold rounded-md px-3 py-1 shadow-xs transition"
-              title="Clone repository catalog or import from website with AI"
-            >
-              <span className="font-mono text-[11px]">&lt;&gt;</span>
-              <span>Code / Clone</span>
-            </button>
-
             <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-md px-2.5 py-1 font-semibold text-[#24292f] transition">
               <span>Pin</span>
             </button>

@@ -125,16 +125,6 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 text-[#57606a] ${loading ? "animate-spin text-[#0969da]" : ""}`} />
           </button>
 
-          {/* GitHub Code / Clone Button */}
-          <button
-            onClick={onOpenClone}
-            className="flex items-center space-x-1.5 bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-semibold px-2.5 py-1.5 rounded-md shadow-xs transition"
-            title="Import medications from websites with Gemini AI"
-          >
-            <span className="font-mono text-[11px]">&lt;&gt;</span>
-            <span>Code</span>
-          </button>
-
           {/* Bot link */}
           <a
             href="https://t.me/biznesgo_bot"

@@ -481,7 +481,7 @@ JORIY HOLAT:
   const prompt = `Foydalanuvchi: "${userMsg}"\n\nSamimiy, do'stona va lo'nda javob bering:`;
 
   const aiClient = new GoogleGenAI({ apiKey });
-  const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
+  const models = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
   let replyText = "";
 
   for (const m of models) {
