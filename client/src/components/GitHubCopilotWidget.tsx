@@ -22,7 +22,11 @@ interface Message {
   thoughts?: string[];
 }
 
-export const GitHubCopilotWidget: React.FC = () => {
+interface GitHubCopilotWidgetProps {
+  currentRepo?: string;
+}
+
+export const GitHubCopilotWidget: React.FC<GitHubCopilotWidgetProps> = ({ currentRepo = "biznesgo" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "security">("chat");
   const [messages, setMessages] = useState<Message[]>([
@@ -91,6 +95,7 @@ export const GitHubCopilotWidget: React.FC = () => {
     try {
       const res = await axios.post("/api/copilot/chat", {
         message: text,
+        currentRepo,
       });
 
       const clientDuration = Math.max(1, Math.round((Date.now() - startEpoch) / 1000));

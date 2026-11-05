@@ -284,7 +284,7 @@ export function App() {
       />
 
       {/* Floating Copilot Widget */}
-      <GitHubCopilotWidget />
+      <GitHubCopilotWidget currentRepo={currentRepo} />
 
       {/* Big Image Preview Modal */}
       <ImageModal

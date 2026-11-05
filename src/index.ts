@@ -10,6 +10,7 @@ import medicinesRouter from "./routes/medicines.js";
 import imagesRouter from "./routes/images.js";
 import cloneRouter from "./routes/clone.js";
 import copilotRouter from "./routes/copilot.js";
+import internalBridgeRouter from "./routes/internalBridge.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,7 @@ app.use("/api", medicinesRouter);
 app.use("/api", imagesRouter);
 app.use("/api", cloneRouter);
 app.use("/api", copilotRouter);
+app.use("/api", internalBridgeRouter);
 
 // Bot diagnostics endpoint
 app.get("/api/test-bot", async (req, res) => {

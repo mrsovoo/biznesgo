@@ -10,7 +10,7 @@ const router = Router();
 // Copilot Chat message
 router.post("/copilot/chat", async (req, res) => {
   try {
-    const { message, history, apiKey } = req.body;
+    const { message, history, apiKey, currentRepo } = req.body;
     if (!message || typeof message !== "string") {
       return res.status(400).json({ success: false, message: "Xabar matni bo'sh bo'lmasligi kerak." });
     }
@@ -19,6 +19,7 @@ router.post("/copilot/chat", async (req, res) => {
       message: message.trim(),
       history,
       userApiKey: apiKey,
+      currentRepo,
     });
 
     res.json({

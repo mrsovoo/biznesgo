@@ -183,13 +183,14 @@ export async function getAllMedicines(query?: {
 export async function deleteMedicine(id: number): Promise<boolean> {
   const db = getDbPool();
   try {
-    const res = await db.query(`DELETE FROM medicines WHERE id = $1`, [id]);
+    const res = await db.query(`DELETE FROM medicines WHERE id = $1 RETURNING name, unit, repository`, [id]);
     const deleted = (res.rowCount ?? 0) > 0;
-    if (deleted) {
+    if (deleted && res.rows[0]) {
+      const item = res.rows[0];
       await recordCommit({
-        message: `chore(catalog): remove item #${id} from inventory`,
-        author: "admin",
-        folder: "root",
+        message: `chore(${item.repository || "catalog"}): remove ${item.name} (${item.unit})`,
+        author: "copilot",
+        folder: item.unit ? item.unit.toLowerCase() : "root",
       }).catch(() => {});
     }
     return deleted;
@@ -200,6 +201,119 @@ export async function deleteMedicine(id: number): Promise<boolean> {
       return true;
     }
     return false;
+  }
+}
+
+export async function deleteMedicinesByName(
+  nameQuery: string,
+  repository?: string
+): Promise<{ count: number; deletedNames: string[] }> {
+  const db = getDbPool();
+  const clean = nameQuery.trim().toLowerCase();
+  try {
+    let sql = `DELETE FROM medicines WHERE LOWER(name) LIKE $1`;
+    const params: any[] = [`%${clean}%`];
+    if (repository && repository !== "all") {
+      params.push(repository.trim().toLowerCase());
+      sql += ` AND LOWER(repository) = $2`;
+    }
+    sql += ` RETURNING name, unit, repository`;
+    const res = await db.query(sql, params);
+    const count = res.rowCount ?? 0;
+    const deletedNames = res.rows.map((r: any) => `${r.name} (${r.unit})`);
+    if (count > 0) {
+      await recordCommit({
+        message: `chore: remove ${count} items matching "${nameQuery}"`,
+        author: "copilot",
+        folder: "root",
+      }).catch(() => {});
+    }
+    return { count, deletedNames };
+  } catch (err) {
+    const toDelete = memoryStore.filter(
+      (m) =>
+        m.name.toLowerCase().includes(clean) &&
+        (!repository || repository === "all" || (m.repository || "biznesgo").toLowerCase() === repository.toLowerCase())
+    );
+    for (const item of toDelete) {
+      const idx = memoryStore.indexOf(item);
+      if (idx !== -1) memoryStore.splice(idx, 1);
+    }
+    return { count: toDelete.length, deletedNames: toDelete.map((m) => `${m.name} (${m.unit})`) };
+  }
+}
+
+export async function deleteMedicinesByUnit(
+  unit: string,
+  repository?: string
+): Promise<{ count: number; unit: string }> {
+  const db = getDbPool();
+  const cleanUnit = unit.trim().toLowerCase();
+  try {
+    let sql = `DELETE FROM medicines WHERE LOWER(unit) = $1`;
+    const params: any[] = [cleanUnit];
+    if (repository && repository !== "all") {
+      params.push(repository.trim().toLowerCase());
+      sql += ` AND LOWER(repository) = $2`;
+    }
+    sql += ` RETURNING id`;
+    const res = await db.query(sql, params);
+    const count = res.rowCount ?? 0;
+    if (count > 0) {
+      await recordCommit({
+        message: `chore: purge folder ${cleanUnit}/ (${count} items)`,
+        author: "copilot",
+        folder: cleanUnit,
+      }).catch(() => {});
+    }
+    return { count, unit: cleanUnit };
+  } catch (err) {
+    const toDelete = memoryStore.filter(
+      (m) =>
+        m.unit.toLowerCase() === cleanUnit &&
+        (!repository || repository === "all" || (m.repository || "biznesgo").toLowerCase() === repository.toLowerCase())
+    );
+    for (const item of toDelete) {
+      const idx = memoryStore.indexOf(item);
+      if (idx !== -1) memoryStore.splice(idx, 1);
+    }
+    return { count: toDelete.length, unit: cleanUnit };
+  }
+}
+
+export async function clearAllMedicines(
+  repository?: string
+): Promise<{ count: number; repository: string }> {
+  const db = getDbPool();
+  const targetRepo = repository && repository !== "all" ? repository.trim().toLowerCase() : "all";
+  try {
+    let sql = `DELETE FROM medicines`;
+    const params: any[] = [];
+    if (targetRepo !== "all") {
+      params.push(targetRepo);
+      sql += ` WHERE LOWER(repository) = $1`;
+    }
+    sql += ` RETURNING id`;
+    const res = await db.query(sql, params);
+    const count = res.rowCount ?? 0;
+    await recordCommit({
+      message: `chore: reset inventory for ${targetRepo} (${count} items removed)`,
+      author: "copilot",
+      folder: "root",
+    }).catch(() => {});
+    return { count, repository: targetRepo };
+  } catch (err) {
+    const beforeCount = memoryStore.length;
+    if (targetRepo === "all") {
+      memoryStore.length = 0;
+    } else {
+      const remaining = memoryStore.filter(
+        (m) => (m.repository || "biznesgo").toLowerCase() !== targetRepo
+      );
+      memoryStore.length = 0;
+      memoryStore.push(...remaining);
+    }
+    return { count: beforeCount - memoryStore.length, repository: targetRepo };
   }
 }
 
