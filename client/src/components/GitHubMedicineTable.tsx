@@ -2,17 +2,17 @@ import React from "react";
 import { Medicine } from "../types";
 import {
   GitBranch,
-  Search,
-  Filter,
-  Trash2,
-  Eye,
+  Folder,
   FileText,
+  FileCode,
   Image as ImageIcon,
   History,
   Send,
   RefreshCw,
   Clock,
-  Sparkles,
+  ArrowLeft,
+  Table as TableIcon,
+  Trash2,
 } from "lucide-react";
 
 interface GitHubMedicineTableProps {
@@ -20,11 +20,10 @@ interface GitHubMedicineTableProps {
   loading: boolean;
   onDelete: (id: number) => void;
   onViewImage: (url: string, name: string) => void;
+  onSelectMedicine: (m: Medicine) => void;
   onRefresh: () => void;
-  searchTerm: string;
-  setSearchTerm: (s: string) => void;
-  selectedUnit: string;
-  setSelectedUnit: (u: string) => void;
+  currentFolder: string | null;
+  setCurrentFolder: (folder: string | null) => void;
 }
 
 export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
@@ -32,83 +31,109 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
   loading,
   onDelete,
   onViewImage,
+  onSelectMedicine,
   onRefresh,
-  searchTerm,
-  setSearchTerm,
-  selectedUnit,
-  setSelectedUnit,
+  currentFolder,
+  setCurrentFolder,
 }) => {
-  const getUnitPillStyle = (unit: string) => {
-    const u = unit.toLowerCase();
-    if (u.includes("litr") || u.includes("ml")) {
-      return "bg-[#ddf4ff] text-[#0969da] border-[#54aeff]/40";
-    }
-    if (u.includes("kg") || u.includes("gramm")) {
-      return "bg-[#fff8c5] text-[#9a6700] border-[#d4a72c]/40";
-    }
-    if (u.includes("dona")) {
-      return "bg-[#dafbe1] text-[#1a7f37] border-[#4ac26b]/40";
-    }
-    return "bg-[#f6f8fa] text-[#57606a] border-[#d0d7de]";
-  };
+  const [viewMode, setViewMode] = React.useState<"files" | "table">("files");
+
+  // Units breakdown
+  const unitCounts: Record<string, number> = {};
+  medicines.forEach((m) => {
+    const u = m.unit.toLowerCase().trim();
+    unitCounts[u] = (unitCounts[u] || 0) + 1;
+  });
+
+  const availableFolders = [
+    { name: "litr", count: unitCounts["litr"] || 0 },
+    { name: "ml", count: unitCounts["ml"] || 0 },
+    { name: "kg", count: unitCounts["kg"] || 0 },
+    { name: "gramm", count: unitCounts["gramm"] || 0 },
+    { name: "dona", count: unitCounts["dona"] || 0 },
+    { name: "all_medicines", count: medicines.length },
+  ];
+
+  // Filter medicines if folder is selected
+  const folderMedicines = currentFolder
+    ? currentFolder === "all_medicines"
+      ? medicines
+      : medicines.filter(
+          (m) => m.unit.toLowerCase().trim() === currentFolder.toLowerCase()
+        )
+    : [];
 
   return (
     <div className="space-y-4">
       {/* GitHub Action Toolbar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Branch Selector */}
+          {/* Branch dropdown */}
           <div className="inline-flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-md px-3 py-1.5 text-xs font-semibold text-[#24292f] shadow-xs cursor-pointer">
             <GitBranch className="w-3.5 h-3.5 text-[#57606a]" />
             <span>main</span>
           </div>
 
-          <span className="text-xs text-[#57606a] hidden sm:inline">
-            <b>1</b> branch · <b>0</b> tags
-          </span>
+          {/* Breadcrumbs */}
+          <div className="flex items-center space-x-1 text-xs font-semibold">
+            <button
+              onClick={() => setCurrentFolder(null)}
+              className="text-[#0969da] hover:underline"
+            >
+              biznesgo
+            </button>
+            {currentFolder && (
+              <>
+                <span className="text-[#57606a]">/</span>
+                <span className="text-[#24292f] font-bold">{currentFolder}</span>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-[#57606a] absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Filter by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-xs bg-white border border-[#d0d7de] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0969da]/20 focus:border-[#0969da] w-48 sm:w-60 text-[#24292f] shadow-xs"
-            />
-          </div>
+        <div className="flex items-center space-x-2">
+          {/* View Mode Toggle when inside a folder */}
+          {currentFolder && (
+            <div className="inline-flex rounded-md shadow-xs bg-[#f6f8fa] border border-[#d0d7de] p-0.5 text-xs">
+              <button
+                onClick={() => setViewMode("files")}
+                className={`px-2.5 py-1 font-semibold rounded transition flex items-center gap-1 ${
+                  viewMode === "files"
+                    ? "bg-white text-[#24292f] shadow-xs"
+                    : "text-[#57606a] hover:text-[#24292f]"
+                }`}
+                title="GitHub Files View (Stealth)"
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Files</span>
+              </button>
 
-          {/* Unit filter */}
-          <div className="flex items-center space-x-1">
-            <Filter className="w-3 h-3 text-[#57606a]" />
-            <select
-              value={selectedUnit}
-              onChange={(e) => setSelectedUnit(e.target.value)}
-              className="text-xs bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-md px-2.5 py-1.5 font-semibold text-[#24292f] shadow-xs focus:outline-none"
-            >
-              <option value="all">All Units</option>
-              <option value="litr">Litr</option>
-              <option value="ml">ml</option>
-              <option value="kg">kg</option>
-              <option value="gramm">Gramm</option>
-              <option value="dona">Dona</option>
-            </select>
-          </div>
+              <button
+                onClick={() => setViewMode("table")}
+                className={`px-2.5 py-1 font-semibold rounded transition flex items-center gap-1 ${
+                  viewMode === "table"
+                    ? "bg-white text-[#24292f] shadow-xs"
+                    : "text-[#57606a] hover:text-[#24292f]"
+                }`}
+                title="Database Inspector View"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>Inspector</span>
+              </button>
+            </div>
+          )}
 
           {/* Refresh button */}
           <button
             onClick={onRefresh}
             disabled={loading}
-            className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] text-[#24292f] text-xs font-semibold px-2.5 py-1.5 rounded-md shadow-xs transition"
-            title="Refresh"
+            className="flex items-center space-x-1 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] text-[#24292f] text-xs font-semibold px-2.5 py-1.5 rounded-md shadow-xs transition"
+            title="Refresh database"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-[#57606a] ${loading ? "animate-spin text-[#0969da]" : ""}`} />
           </button>
 
-          {/* Green GitHub action button */}
+          {/* Bot link */}
           <a
             href="https://t.me/biznesgo_bot"
             target="_blank"
@@ -116,12 +141,12 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
             className="flex items-center space-x-1.5 bg-[#1f883d] hover:bg-[#1a7f37] text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-xs transition"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Botga o'tish</span>
+            <span className="hidden sm:inline">Bot</span>
           </a>
         </div>
       </div>
 
-      {/* GitHub Repository Content Container */}
+      {/* GitHub Repository Content Box */}
       <div className="border border-[#d0d7de] rounded-md overflow-hidden bg-white shadow-xs">
         {/* Latest Commit Strip */}
         <div className="bg-[#f6f8fa] border-b border-[#d0d7de] p-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-[#57606a] gap-2">
@@ -131,158 +156,214 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
             </div>
             <span className="font-semibold text-[#24292f]">sohibjonsulaymonov</span>
             <span className="text-[#24292f] truncate">
-              feat: live medicines synced with Neon PostgreSQL
+              {currentFolder
+                ? `inventory: catalog sync in ${currentFolder}/ (${folderMedicines.length} entries)`
+                : "chore: update Neon PostgreSQL inventory schemas"}
             </span>
           </div>
 
           <div className="flex items-center space-x-3 text-[11px] shrink-0 font-mono">
-            <span className="text-[#0969da] hover:underline cursor-pointer">7b4d19e</span>
+            <span className="text-[#0969da] hover:underline cursor-pointer">8b2f91a</span>
             <span className="flex items-center space-x-1">
               <Clock className="w-3 h-3 text-[#57606a]" />
               <span>just now</span>
             </span>
             <div className="flex items-center space-x-1 font-semibold text-[#24292f] pl-2 border-l border-[#d0d7de]">
               <History className="w-3.5 h-3.5 text-[#57606a]" />
-              <span>{medicines.length} items</span>
+              <span>History</span>
             </div>
           </div>
         </div>
 
-        {/* Medicines Table / File List */}
+        {/* Directory / File Tree */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-[#d0d7de] text-[#656d76] bg-[#ffffff] font-semibold text-[11px]">
-                <th className="py-2.5 px-4 w-16">Preview</th>
-                <th className="py-2.5 px-4">Medicine Name</th>
-                <th className="py-2.5 px-4">Quantity & Unit</th>
-                <th className="py-2.5 px-4">Author (Telegram ID)</th>
-                <th className="py-2.5 px-4">Added Time</th>
-                <th className="py-2.5 px-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#d0d7de]/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#57606a]">
-                    <div className="inline-block w-5 h-5 border-2 border-[#0969da] border-t-transparent rounded-full animate-spin mb-2"></div>
-                    <p>Loading database records...</p>
+            <tbody className="divide-y divide-[#d0d7de]/50">
+              {/* Back to parent folder if inside a folder */}
+              {currentFolder && (
+                <tr
+                  onClick={() => setCurrentFolder(null)}
+                  className="hover:bg-[#f6f8fa] transition-colors cursor-pointer text-[#0969da] font-semibold"
+                >
+                  <td className="py-2.5 px-4 w-12 text-[#57606a]">
+                    <ArrowLeft className="w-4 h-4 text-[#57606a]" />
+                  </td>
+                  <td colSpan={3} className="py-2.5 px-4">
+                    .. (Go back to root)
                   </td>
                 </tr>
-              ) : medicines.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-14 text-center text-[#57606a]">
-                    <div className="w-10 h-10 rounded-full bg-[#f6f8fa] border border-[#d0d7de] text-[#57606a] flex items-center justify-center mx-auto mb-2">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <p className="font-semibold text-[#24292f]">No medicines found</p>
-                    <p className="text-[11px] text-[#57606a] mt-1">
-                      Telegram botingizga kirib (/start), birinchi dorini qo'shing.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                medicines.map((item) => {
-                  const imageUrl = `/api/images/telegram/${item.photo_file_id}`;
-                  const dateObj = new Date(item.created_at);
-                  const formattedDate = dateObj.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  });
-                  const formattedTime = dateObj.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
+              )}
 
-                  return (
+              {/* ROOT VIEW: Folder List (litr, ml, kg, gramm, dona, all) */}
+              {!currentFolder && (
+                <>
+                  {availableFolders.map((f) => (
                     <tr
-                      key={item.id}
-                      className="hover:bg-[#f6f8fa] transition-colors group"
+                      key={f.name}
+                      onClick={() => setCurrentFolder(f.name)}
+                      className="hover:bg-[#f6f8fa] transition-colors cursor-pointer group"
                     >
-                      {/* Image Thumbnail */}
-                      <td className="py-2.5 px-4">
-                        <div
-                          onClick={() => onViewImage(imageUrl, item.name)}
-                          className="w-9 h-9 rounded bg-[#f6f8fa] border border-[#d0d7de] overflow-hidden cursor-pointer relative group/img flex items-center justify-center"
-                          title="Click to preview"
-                        >
-                          <img
-                            src={imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center text-white transition">
-                            <Eye className="w-3.5 h-3.5" />
-                          </div>
-                        </div>
+                      <td className="py-2.5 px-4 w-12 text-[#54aeff]">
+                        <Folder className="w-4 h-4 fill-[#54aeff] text-[#0969da]" />
                       </td>
-
-                      {/* Name with GitHub Blue */}
-                      <td className="py-2.5 px-4 font-semibold">
-                        <div className="flex items-center space-x-2">
-                          <ImageIcon className="w-4 h-4 text-[#57606a] shrink-0" />
-                          <span
-                            onClick={() => onViewImage(imageUrl, item.name)}
-                            className="text-[#0969da] hover:underline cursor-pointer font-medium"
-                          >
-                            {item.name}
-                          </span>
-                          <span className="text-[10px] text-[#57606a] font-mono">
-                            #{item.id}
-                          </span>
-                        </div>
+                      <td className="py-2.5 px-4 font-semibold text-[#0969da] group-hover:underline w-1/3">
+                        {f.name}
                       </td>
-
-                      {/* Quantity & Unit Badge */}
-                      <td className="py-2.5 px-4">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="font-semibold text-[#24292f]">{item.quantity}</span>
-                          <span
-                            className={`border text-[11px] font-medium px-2 py-0.5 rounded-full ${getUnitPillStyle(
-                              item.unit
-                            )}`}
-                          >
-                            {item.unit}
-                          </span>
-                        </div>
+                      <td className="py-2.5 px-4 text-[#57606a] truncate">
+                        inventory: {f.count} items recorded in Neon PostgreSQL
                       </td>
-
-                      {/* Telegram Author */}
-                      <td className="py-2.5 px-4 font-mono text-[#57606a]">
-                        <span className="hover:text-[#0969da] cursor-pointer">
-                          @{item.telegram_username || item.telegram_user_id}
-                        </span>
-                      </td>
-
-                      {/* Date */}
-                      <td className="py-2.5 px-4 text-[#57606a]">
-                        <span>{formattedDate}</span>
-                        <span className="text-[10px] text-[#8c959f] ml-1.5 font-mono">
-                          {formattedTime}
-                        </span>
-                      </td>
-
-                      {/* Action */}
-                      <td className="py-2.5 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            if (confirm(`Dorini o'chirmoqchimisiz: ${item.name}?`)) {
-                              onDelete(item.id);
-                            }
-                          }}
-                          className="text-[#57606a] hover:text-[#cf222e] p-1 rounded hover:bg-[#ffebe9] transition"
-                          title="Delete record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a] whitespace-nowrap">
+                        just now
                       </td>
                     </tr>
-                  );
-                })
+                  ))}
+
+                  {/* Simulated config and schema files for 100% authentic GitHub appearance */}
+                  <tr className="hover:bg-[#f6f8fa] transition-colors text-[#57606a]">
+                    <td className="py-2.5 px-4 w-12">
+                      <FileCode className="w-4 h-4 text-[#57606a]" />
+                    </td>
+                    <td className="py-2.5 px-4 font-medium text-[#24292f] w-1/3">
+                      database.schema.sql
+                    </td>
+                    <td className="py-2.5 px-4 text-[#57606a]">
+                      CREATE TABLE medicines (id, name, unit, quantity, photo_file_id)
+                    </td>
+                    <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a]">
+                      yesterday
+                    </td>
+                  </tr>
+
+                  <tr className="hover:bg-[#f6f8fa] transition-colors text-[#57606a]">
+                    <td className="py-2.5 px-4 w-12">
+                      <FileText className="w-4 h-4 text-[#57606a]" />
+                    </td>
+                    <td className="py-2.5 px-4 font-medium text-[#24292f] w-1/3">
+                      package.json
+                    </td>
+                    <td className="py-2.5 px-4 text-[#57606a]">
+                      feat: production setup with Neon & Grammy bot
+                    </td>
+                    <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a]">
+                      yesterday
+                    </td>
+                  </tr>
+
+                  <tr className="hover:bg-[#f6f8fa] transition-colors text-[#57606a]">
+                    <td className="py-2.5 px-4 w-12">
+                      <FileText className="w-4 h-4 text-[#57606a]" />
+                    </td>
+                    <td className="py-2.5 px-4 font-medium text-[#24292f] w-1/3">
+                      README.md
+                    </td>
+                    <td className="py-2.5 px-4 text-[#57606a]">
+                      docs: update system architecture and API specs
+                    </td>
+                    <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a]">
+                      yesterday
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {/* INSIDE A FOLDER: File Mode or Table Mode */}
+              {currentFolder && (
+                <>
+                  {folderMedicines.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-12 text-center text-[#57606a]">
+                        <Folder className="w-8 h-8 text-[#afb8c1] mx-auto mb-2" />
+                        <p className="font-semibold text-[#24292f]">Ushbu bo'limda hozircha dori yo'q</p>
+                        <p className="text-[11px] text-[#57606a] mt-0.5">
+                          Bot orqali yangi {currentFolder} dorisini qo'shing.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : viewMode === "files" ? (
+                    /* Files view: looks like code files in GitHub */
+                    folderMedicines.map((item) => {
+                      const fileName = `${item.name.toLowerCase().replace(/\s+/g, "_")}_${item.quantity}${item.unit}.json`;
+                      const dateObj = new Date(item.created_at);
+
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => onSelectMedicine(item)}
+                          className="hover:bg-[#f6f8fa] transition-colors cursor-pointer group"
+                        >
+                          <td className="py-2.5 px-4 w-12 text-[#57606a]">
+                            <FileCode className="w-4 h-4 text-[#0969da]" />
+                          </td>
+                          <td className="py-2.5 px-4 font-semibold text-[#0969da] group-hover:underline w-1/3">
+                            {fileName}
+                          </td>
+                          <td className="py-2.5 px-4 text-[#57606a] truncate">
+                            <span className="text-[#24292f] font-medium mr-2">{item.name}</span>
+                            <span className="bg-[#ddf4ff] text-[#0969da] text-[10px] px-1.5 py-0.2 rounded font-semibold mr-2">
+                              {item.quantity} {item.unit}
+                            </span>
+                            <span className="text-[11px] text-[#8c959f]">
+                              Author: @{item.telegram_username || item.telegram_user_id}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a] whitespace-nowrap">
+                            {dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    /* Inspector Table Mode with thumbnails */
+                    folderMedicines.map((item) => {
+                      const imageUrl = `/api/images/telegram/${item.photo_file_id}`;
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-[#f6f8fa] transition-colors"
+                        >
+                          <td className="py-2 px-4 w-12">
+                            <div
+                              onClick={() => onViewImage(imageUrl, item.name)}
+                              className="w-8 h-8 rounded bg-[#f6f8fa] border border-[#d0d7de] overflow-hidden cursor-pointer flex items-center justify-center"
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </td>
+                          <td
+                            onClick={() => onSelectMedicine(item)}
+                            className="py-2.5 px-4 font-semibold text-[#0969da] hover:underline cursor-pointer"
+                          >
+                            {item.name}
+                            <span className="text-[10px] text-[#8c959f] ml-1.5 font-mono">#{item.id}</span>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <span className="font-bold text-[#24292f] mr-1.5">{item.quantity}</span>
+                            <span className="text-[10px] bg-[#dafbe1] text-[#1a7f37] border border-[#4ac26b]/40 px-1.5 py-0.5 rounded font-semibold">
+                              {item.unit}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-right">
+                            <button
+                              onClick={() => {
+                                if (confirm(`Dorini o'chirmoqchimisiz: ${item.name}?`)) {
+                                  onDelete(item.id);
+                                }
+                              }}
+                              className="text-[#57606a] hover:text-[#cf222e] p-1 rounded hover:bg-[#ffebe9] transition"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </>
               )}
             </tbody>
           </table>
@@ -291,4 +372,3 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
     </div>
   );
 };
-
