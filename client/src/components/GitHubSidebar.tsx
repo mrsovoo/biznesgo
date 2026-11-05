@@ -1,25 +1,61 @@
 import React from "react";
-import { Tag, Package, Users, Activity, ExternalLink, ShieldCheck } from "lucide-react";
+import { Tag, Package, Users, Activity, ExternalLink, ShieldCheck, Globe } from "lucide-react";
+import { Repository } from "../types";
 
 interface GitHubSidebarProps {
   totalCount: number;
   uniqueUsers: number;
+  currentRepo?: string;
+  repoData?: Repository;
 }
 
-export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({ totalCount, uniqueUsers }) => {
+export const GitHubSidebar: React.FC<GitHubSidebarProps> = ({
+  totalCount,
+  uniqueUsers,
+  currentRepo = "biznesgo",
+  repoData,
+}) => {
+  const isMaster = currentRepo.toLowerCase() === "biznesgo";
+  const sourceUrl = repoData?.source_url;
+
   return (
     <div className="space-y-6 text-xs text-[#57606a]">
       {/* About Section */}
       <div className="space-y-3">
         <h3 className="font-semibold text-sm text-[#1f2328]">About</h3>
         <p className="text-[#1f2328] leading-relaxed">
-          High-performance distributed database & inventory catalog with real-time Telegram integration and Neon PostgreSQL persistence.
+          {isMaster
+            ? "Markaziy master katalog: Barcha klonlangan agro va veterinariya saytlarining yagona jamlangan ombori."
+            : repoData?.description || `${currentRepo} veb-saytidan klonlangan veterinariya va agro dori vositalari katalogi.`}
         </p>
 
+        {/* Real Website Source Link (Authentic GitHub repo URL section) */}
+        {sourceUrl ? (
+          <div className="flex items-center space-x-2 text-[#0969da] pt-1 font-semibold truncate">
+            <Globe className="w-3.5 h-3.5 shrink-0 text-[#1a7f37]" />
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline truncate"
+              title={`Asl sayt: ${sourceUrl}`}
+            >
+              {sourceUrl.replace(/^https?:\/\//, "")}
+            </a>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2 text-[#0969da] pt-1 font-semibold">
+            <Globe className="w-3.5 h-3.5 shrink-0 text-[#1a7f37]" />
+            <a href="https://biznesgo.uz" target="_blank" rel="noreferrer" className="hover:underline">
+              https://biznesgo.uz
+            </a>
+          </div>
+        )}
+
         <div className="flex items-center space-x-2 text-[#0969da] pt-1 font-semibold">
-          <ExternalLink className="w-3.5 h-3.5" />
+          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
           <a href="https://t.me/biznesgo_bot" target="_blank" rel="noreferrer" className="hover:underline">
-            https://t.me/biznesgo_bot
+            Telegram: @biznesgo_bot
           </a>
         </div>
 

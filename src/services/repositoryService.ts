@@ -37,7 +37,16 @@ export async function getAllRepositories(): Promise<RepositoryItem[]> {
   const db = getDbPool();
   try {
     const res = await db.query<RepositoryItem>(`
-      SELECT r.*, COUNT(m.id)::int as count
+      SELECT 
+        r.id,
+        r.name,
+        r.source_url,
+        r.description,
+        r.created_at,
+        CASE 
+          WHEN r.name = 'biznesgo' THEN (SELECT COUNT(*)::int FROM medicines)
+          ELSE COUNT(m.id)::int 
+        END as count
       FROM repositories r
       LEFT JOIN medicines m ON m.repository = r.name
       GROUP BY r.id, r.name, r.source_url, r.description, r.created_at

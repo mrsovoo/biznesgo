@@ -48,9 +48,15 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
             <span className="text-[#0969da] font-bold font-mono">
               {currentRepo}
             </span>
-            <span className="text-[11px] font-medium text-[#57606a] border border-[#d0d7de] rounded-full px-2 py-0.5 ml-2 bg-white">
-              Public
-            </span>
+            {currentRepo.toLowerCase() === "biznesgo" ? (
+              <span className="text-[11px] font-semibold text-[#1a7f37] bg-[#dafbe1] border border-[#4ac26b]/40 rounded-full px-2 py-0.5 ml-2">
+                📌 Pinned Master (Barcha dorilar)
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium text-[#57606a] border border-[#d0d7de] rounded-full px-2 py-0.5 ml-2 bg-white">
+                Public
+              </span>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 text-xs">

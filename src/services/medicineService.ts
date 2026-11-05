@@ -135,7 +135,10 @@ export async function getAllMedicines(query?: {
     const params: any[] = [];
     const conditions: string[] = [];
 
-    if (query?.repository && query.repository !== "all") {
+    // 'biznesgo' is the Master Pinned Catalog: it aggregates all medicines across all repositories
+    const isMasterRepo = !query?.repository || query.repository === "all" || query.repository.toLowerCase() === "biznesgo";
+
+    if (!isMasterRepo && query?.repository) {
       params.push(query.repository.trim().toLowerCase());
       conditions.push(`LOWER(repository) = $${params.length}`);
     }
@@ -161,7 +164,8 @@ export async function getAllMedicines(query?: {
   } catch (err) {
     console.warn("Bazadan o'qishda xatolik, xotiradagi ma'lumotlar qaytariladi:", err);
     let list = [...memoryStore];
-    if (query?.repository && query.repository !== "all") {
+    const isMasterRepo = !query?.repository || query.repository === "all" || query.repository.toLowerCase() === "biznesgo";
+    if (!isMasterRepo && query?.repository) {
       list = list.filter((m) => (m.repository || "biznesgo").toLowerCase() === query.repository?.toLowerCase());
     }
     if (query?.search) {

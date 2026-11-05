@@ -12,6 +12,8 @@ import {
   Clock,
   ArrowLeft,
   Trash2,
+  BookMarked,
+  ExternalLink,
 } from "lucide-react";
 
 interface GitHubMedicineTableProps {
@@ -27,6 +29,7 @@ interface GitHubMedicineTableProps {
   latestCommit?: Commit | null;
   folderCommits?: Record<string, Commit>;
   currentRepo?: string;
+  onSelectRepo?: (repoName: string) => void;
 }
 
 export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
@@ -42,6 +45,7 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
   latestCommit,
   folderCommits = {},
   currentRepo = "biznesgo",
+  onSelectRepo,
 }) => {
   // Units breakdown
   const unitCounts: Record<string, number> = {};
@@ -305,7 +309,7 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                             </div>
                           </td>
 
-                          {/* Name & File tag */}
+                          {/* Name & Origin Repo Badge */}
                           <td
                             onClick={() => onSelectMedicine(item)}
                             className="py-2.5 px-3 font-semibold text-[#0969da] group-hover:underline cursor-pointer"
@@ -315,6 +319,38 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                               <span className="text-[10px] text-[#57606a] font-mono bg-[#f6f8fa] px-1.5 py-0.2 rounded border border-[#d0d7de]/60 w-fit mt-0.5 sm:mt-0">
                                 {fileName}
                               </span>
+
+                              {/* Origin Repo Badge (Shows where medicine came from) */}
+                              {item.repository && (
+                                <span
+                                  onClick={(e) => {
+                                    if (onSelectRepo) {
+                                      e.stopPropagation();
+                                      onSelectRepo(item.repository!);
+                                    }
+                                  }}
+                                  className="text-[10px] text-[#0969da] hover:underline bg-[#ddf4ff] hover:bg-[#b6e3ff] border border-[#54aeff]/30 px-1.5 py-0.2 rounded-full font-mono inline-flex items-center gap-1 w-fit mt-0.5 sm:mt-0 transition"
+                                  title={`Manba repozitoriyasi: mrsovoo / ${item.repository}`}
+                                >
+                                  <BookMarked className="w-2.5 h-2.5" />
+                                  <span>mrsovoo/{item.repository}</span>
+                                </span>
+                              )}
+
+                              {/* Source website link if cloned */}
+                              {item.source_url && (
+                                <a
+                                  href={item.source_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[10px] text-[#57606a] hover:text-[#0969da] inline-flex items-center gap-0.5 hover:underline pl-1"
+                                  title={`Asl sayt havolasi: ${item.source_url}`}
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                  <span className="truncate max-w-[120px]">{item.source_url.replace(/^https?:\/\//, "")}</span>
+                                </a>
+                              )}
                             </div>
                           </td>
 

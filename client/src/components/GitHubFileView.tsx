@@ -37,6 +37,8 @@ export const GitHubFileView: React.FC<GitHubFileViewProps> = ({
       schema_version: "2.1.0",
       id: medicine.id,
       name: medicine.name,
+      repository: `mrsovoo/${medicine.repository || currentRepo}`,
+      source_url: medicine.source_url || null,
       measurement: {
         unit: medicine.unit,
         quantity: medicine.quantity,
@@ -47,6 +49,7 @@ export const GitHubFileView: React.FC<GitHubFileViewProps> = ({
         author_username: medicine.telegram_username ? `@${medicine.telegram_username}` : null,
         created_at: medicine.created_at,
         photo_file_id: medicine.photo_file_id,
+        photo_url: imageUrl,
         status: "active_stock",
       },
     },
@@ -224,6 +227,27 @@ export const GitHubFileView: React.FC<GitHubFileViewProps> = ({
                   <p className="text-sm font-bold text-[#1f2328] mt-1 font-mono">
                     {medicine.telegram_username ? `@${medicine.telegram_username}` : medicine.telegram_user_id}
                   </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-md bg-white border border-[#d0d7de] space-y-1.5">
+                <p className="text-[#57606a] uppercase font-semibold text-[10px]">Tegishli Repozitoriy & Manba</p>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <span className="text-xs font-mono font-bold text-[#0969da] bg-[#ddf4ff] px-2 py-0.5 rounded border border-[#54aeff]/30">
+                    mrsovoo / {medicine.repository || currentRepo}
+                  </span>
+                  {medicine.source_url && (
+                    <a
+                      href={medicine.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-[#0969da] hover:underline inline-flex items-center gap-1 font-mono"
+                      title={medicine.source_url}
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span className="truncate max-w-[200px]">{medicine.source_url}</span>
+                    </a>
+                  )}
                 </div>
               </div>
 

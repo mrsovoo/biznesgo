@@ -232,6 +232,10 @@ export function App() {
                     latestCommit={latestCommit}
                     folderCommits={folderCommits}
                     currentRepo={currentRepo}
+                    onSelectRepo={(rName) => {
+                      setCurrentRepo(rName);
+                      setView("repo");
+                    }}
                   />
 
                   {/* Folder-specific or Root README.md box below */}
@@ -249,6 +253,8 @@ export function App() {
                   <GitHubSidebar
                     totalCount={stats.total}
                     uniqueUsers={stats.uniqueUsers}
+                    currentRepo={currentRepo}
+                    repoData={repositories.find((r) => r.name.toLowerCase() === currentRepo.toLowerCase())}
                   />
                 </div>
               </div>

@@ -205,11 +205,13 @@ export const GitHubRepositoriesDashboard: React.FC<GitHubRepositoriesDashboardPr
         {/* Repository Items List */}
         <div className="divide-y divide-[#d0d7de]/70">
           {filteredRepos.map((repo) => {
-            const isMaster = repo.name === "biznesgo" || repo.name === "tbovet" || repo.name === repositories[0]?.name;
+            const isMaster = repo.name.toLowerCase() === "biznesgo";
             const repoTitle = `mrsovoo / ${repo.name}`;
             const desc =
               repo.description ||
-              (repo.source_url
+              (isMaster
+                ? "Markaziy master katalog (Barcha klonlangan saytlar dorilarining umumiy jamlanmasi)"
+                : repo.source_url
                 ? `${repo.source_url.replace(/^https?:\/\//, "")} saytidan klonlangan katalog`
                 : "Veterinariya va agrokimyoviy dori vositalari repozitoriyasi");
 
@@ -219,20 +221,26 @@ export const GitHubRepositoriesDashboard: React.FC<GitHubRepositoriesDashboardPr
                 onClick={() => onSelectRepo(repo.name)}
                 className="py-4 hover:bg-[#f6f8fa]/60 transition-colors cursor-pointer group flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1 rounded-md"
               >
-                {/* Left side: Book icon, Repo title, description */}
+                {/* Left side: Book icon, Repo title, description, link */}
                 <div className="space-y-1.5 min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <BookMarked className="w-4 h-4 text-[#57606a] shrink-0" />
                     <span className="font-semibold text-sm text-[#0969da] group-hover:underline truncate font-mono">
                       {repoTitle}
                     </span>
                     {isMaster ? (
-                      <span className="text-[10px] bg-[#dafbe1] text-[#1a7f37] border border-[#4ac26b]/40 font-semibold px-2 py-0.2 rounded-full">
-                        Master Catalog
+                      <span className="text-[10px] bg-[#dafbe1] text-[#1a7f37] border border-[#4ac26b]/40 font-semibold px-2 py-0.2 rounded-full flex items-center gap-1">
+                        <span>📌 Pinned Master</span>
                       </span>
                     ) : (
                       <span className="text-[10px] text-[#57606a] border border-[#d0d7de] font-medium px-2 py-0.2 rounded-full bg-white">
                         Public
+                      </span>
+                    )}
+
+                    {repo.count !== undefined && (
+                      <span className="text-[11px] text-[#57606a] font-mono bg-[#f6f8fa] px-1.5 py-0.2 rounded border border-[#d0d7de]/60">
+                        {repo.count} ta dori
                       </span>
                     )}
                   </div>
@@ -240,6 +248,23 @@ export const GitHubRepositoriesDashboard: React.FC<GitHubRepositoriesDashboardPr
                   <p className="text-xs text-[#57606a] leading-relaxed line-clamp-1 pl-6">
                     {desc}
                   </p>
+
+                  {/* Real Website Source URL */}
+                  {repo.source_url && (
+                    <div className="pl-6 pt-0.5">
+                      <a
+                        href={repo.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center space-x-1 text-[#0969da] hover:underline text-[11px] font-mono"
+                        title={repo.source_url}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span className="truncate">{repo.source_url}</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right side: Language, Stars, Forks, Action settings */}
