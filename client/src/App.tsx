@@ -62,7 +62,14 @@ export function App() {
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 12000);
-    return () => clearInterval(interval);
+    const handleRefresh = () => {
+      fetchData();
+    };
+    window.addEventListener("gitgo:refresh_medicines", handleRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("gitgo:refresh_medicines", handleRefresh);
+    };
   }, [fetchData]);
 
   const handleDelete = async (id: number) => {

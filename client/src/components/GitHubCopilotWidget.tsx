@@ -96,6 +96,10 @@ export const GitHubCopilotWidget: React.FC = () => {
       const clientDuration = Math.max(1, Math.round((Date.now() - startEpoch) / 1000));
 
       if (res.data.success) {
+        if (res.data.refreshData || res.data.actionTaken === "CLONE_COMPLETED") {
+          window.dispatchEvent(new CustomEvent("gitgo:refresh_medicines"));
+        }
+
         setMessages((prev) => [
           ...prev,
           {

@@ -139,6 +139,7 @@ export async function runCopilotChat(data: {
 }): Promise<{
   reply: string;
   actionTaken?: string;
+  refreshData?: boolean;
   durationSeconds?: number;
   thoughts?: string[];
   data?: any;
@@ -148,61 +149,101 @@ export async function runCopilotChat(data: {
 
   if (!apiKey) {
     return {
-      reply: "⚠️ Gemini API Key aniqlanmadi. Iltimos, .env fayliga GEMINI_API_KEY ni qo'ying.",
+      reply: "⚠️ Gemini API Key topilmadi. Iltimos, .env fayliga GEMINI_API_KEY ni qo'ying.",
       durationSeconds: 1,
       thoughts: ["Xatolik: API kaliti topilmadi"],
     };
   }
 
-  const aiClient = new GoogleGenAI({ apiKey });
+  // 1. Check if user wants to clone a website URL (contains http/https)
+  const urlRegex = /(https?:\/\/[^\s"'<>]+)/gi;
+  const foundUrls = data.message.match(urlRegex);
 
-  // 1. Fetch current system state to give Copilot 100% real-time awareness
+  if (foundUrls && foundUrls.length > 0) {
+    const targetUrl = foundUrls[0];
+    try {
+      console.log(`Copilot orqali sayt klonlash boshlandi: ${targetUrl}`);
+      const report = await cloneMedicinesFromUrl(targetUrl, apiKey);
+      const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+
+      let reply = `✅ **Saytdan dori vositalari muvaffaqiyatli klonlandi!**\n\n`;
+      reply += `🔗 **Sayt:** \`${targetUrl}\`\n`;
+      reply += `📦 **Jami topildi:** ${report.totalFound} ta dori\n`;
+      reply += `✨ **Yangi qo'shildi:** ${report.addedCount} ta\n`;
+      reply += `⏭️ **Allaqachon mavjud:** ${report.skippedCount} ta\n\n`;
+
+      if (report.addedCount > 0) {
+        reply += `Barcha yangi dorilar fotosurati, o'lchov birligi (litr, ml, kg, dona) va miqdori bilan bazaga qo'shildi hamda GitHub commit qilindi!`;
+      } else if (report.totalFound > 0) {
+        reply += `Ushbu sahifadagi hamma dorilar allaqachon bazamizda bor ekan, shuning uchun takroriy qo'shilmadi.`;
+      } else {
+        reply += `Saytdan aniq dori mahsulotlari topilmadi. Iltimos, dori katalogi yoki mahsulotlar sahifasi havolasini bering.`;
+      }
+
+      return {
+        reply,
+        actionTaken: "CLONE_COMPLETED",
+        refreshData: true,
+        durationSeconds,
+        thoughts: [
+          `Havola aniqlandi: ${targetUrl}`,
+          `HTML va fotosuratlar yuklab olindi`,
+          `Gemini AI dori vositalarini ajratib oldi (${report.totalFound} ta)`,
+          `Neon PostgreSQL bazasida dublikatlar tekshirildi`,
+          `${report.addedCount} ta yangi dori bazaga kiritildi va commit qilindi`,
+        ],
+        data: {
+          report,
+        },
+      };
+    } catch (err: any) {
+      const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+      return {
+        reply: `Kechirasiz, saytni klonlashda xatolik yuz berdi: ${err.message}. Iltimos, havola to'g'riligini va sayt ochiqligini tekshiring.`,
+        durationSeconds,
+        thoughts: [`Klonlashda xatolik: ${err.message}`],
+      };
+    }
+  }
+
+  // 2. Fetch current system state for real-time awareness
   const [stats, medicines, latestCommit] = await Promise.all([
     getStats(),
     getAllMedicines({}),
     getLatestCommit(),
   ]);
 
-  const medicineSummary = medicines.slice(0, 30).map((m) => ({
-    id: m.id,
+  const medicineSummary = medicines.slice(0, 20).map((m) => ({
     name: m.name,
     unit: m.unit,
     qty: m.quantity,
-    category: m.category,
-    source: m.source_url ? "cloned" : "bot",
   }));
 
   const systemInstruction = `
-You are the official GitGo / GitHub Copilot AI Assistant embedded directly into the inventory control system.
-You have FULL ACCESS to the internal database, catalog, and operations.
+Siz GitGo (GitHub ko'rinishidagi veterinariya va agro dori-darmonlar bazasi) tizimining do'stona, samimiy va tezkor Copilot AI yordamchisisiz.
+Foydalanuvchi sizning hamkoringiz. U bilan o'zbek tilida tabiiy, jonli va do'stona suhbatlashing.
 
-CURRENT SYSTEM CONTEXT:
-- Total medicines in database: ${stats.total}
-- Distribution by units: ${JSON.stringify(stats.byUnit)}
-- Latest commit: ${latestCommit?.message} (${latestCommit?.sha})
-- Sample of active records (up to 30):
-${JSON.stringify(medicineSummary, null, 2)}
+MUHIM QOIDALAR:
+1. ROBOTDEK GAPIRMANG! Rasmiyatchilik, quruq ma'ruzalar, sovuq hisobotlar yoki texnik kodlarni keraksiz tashlamang.
+2. Qisqa va lo'nda javob bering (ko'pi bilan 2-4 gap).
+3. Agar bazada hali dori bo'lmasa, "Total: 0" deb robotdek quruq aytmang, balki: "Hozircha bazamiz bo'sh. Istalgan vet/agro dori saytining havolasini (linkini) bersangiz, darhol o'zim barcha dorilarni rasmlari va birliklari bilan klonlab olib kelib qo'shib beraman!" deb ayting.
+4. Agar foydalanuvchi biror sayt linkini bersa, siz uni avtomatik klonlaysiz.
+5. Agar foydalanuvchi "qanday dorilar bor?" deb so'rasa, bazadagi bor dorilar va ularning litr/ml/kg turlarini qisqa va qiziqarli tilda aytib bering.
 
-STRICT DATA ISOLATION & ZERO-LEAKAGE SECURITY RULES:
-1. You operate strictly INSIDE the internal GitGo perimeter.
-2. NEVER export or dump confidential raw database credentials or send wholesale raw inventory data to third-party endpoints.
-3. External web scraping (cloning) is strictly one-way INBOUND: you only extract clean pharmacology metadata (name, unit, package quantity, photo URL) and discard tracking cookies, scripts, or malicious content.
-4. Internal sharing is ONLY allowed from System A (Master Catalog) to System B (B2B Pharmacy Nodes).
-
-CAPABILITIES YOU CAN DIRECTLY PERFORM FOR THE USER:
-- Query, filter, and inspect medications (by unit: litr, ml, kg, gramm, dona; by category; by date).
-- Provide statistics and inventory advice.
-- When the user asks to clone or scan a website URL (e.g., "ushbu saytdan dorilarni klonla: https://..."), instruct the system to clone it.
-- When the user asks to delete a medication by ID or name, prepare the deletion.
-- Always answer naturally and concisely in Uzbek (or Russian/English if asked in that language).
+TIZIM HOLATI:
+- Jami dorilar: ${stats.total} ta
+- Birliklar: ${JSON.stringify(stats.byUnit)}
+- Oxirgi commit: ${latestCommit?.message || "Boshlang'ich holat"}
+- Mavjud namunalar: ${JSON.stringify(medicineSummary)}
 `;
 
   const prompt = `
-Foydalanuvchi xabari: "${data.message}"
+Foydalanuvchi: "${data.message}"
 
-Tizim holatidan kelib chiqib, aniq, professional va foydali javob bering. Agar foydalanuvchi URL berib klonlashni so'rasa yoki biror amal buyursa, javobingizda aniq tushuntiring.
+Do'stona, samimiy, insoniy va lo'nda javob bering:
 `;
 
+  const aiClient = new GoogleGenAI({ apiKey });
   const models = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-flash-lite"];
   let replyText = "";
   let successfulModel = models[0];
@@ -224,16 +265,15 @@ Tizim holatidan kelib chiqib, aniq, professional va foydali javob bering. Agar f
   }
 
   if (!replyText) {
-    replyText = "Kechirasiz, sun'iy intellekt xizmati hozirda band. Iltimos, bir ozdan so'ng qayta urinib ko'ring.";
+    replyText = "Kechirasiz, bir oz texnik uzilish bo'ldi. Iltimos, qayta yozib ko'ring yoki sayt havolasini yuboring.";
   }
 
   const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
 
   const thoughts = [
-    `Foydalanuvchi so'rovi va mantiqiy maqsadi aniqlandi`,
-    `Neon PostgreSQL dori vositalari bazasi (${stats.total} ta dori) tahlil qilindi`,
-    `Zero-Leakage xavfsizlik filtri tasdiqlandi (ichki perimetr himoyasi)`,
-    `Google Gemini (${successfulModel}) orqali tahliliy xulosa va javob shakllantirildi`,
+    `Foydalanuvchi xabari tahlil qilindi`,
+    `Neon PostgreSQL dori bazasi tekshirildi (${stats.total} ta dori)`,
+    `Google Gemini orqali samimiy va lo'nda javob shakllantirildi`,
   ];
 
   return {
