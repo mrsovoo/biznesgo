@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { GitHubNavbar } from "./components/GitHubNavbar";
 import { GitHubRepoHeader } from "./components/GitHubRepoHeader";
-import { GitHubRepoSidebar } from "./components/GitHubRepoSidebar";
+import { GitHubRepositoriesDashboard } from "./components/GitHubRepositoriesDashboard";
 import { GitHubMedicineTable } from "./components/GitHubMedicineTable";
 import { GitHubFileView } from "./components/GitHubFileView";
 import { GitHubSidebar } from "./components/GitHubSidebar";
@@ -13,6 +13,7 @@ import { ImageModal } from "./components/ImageModal";
 import { Medicine, Stats, Commit, Repository } from "./types";
 
 export function App() {
+  const [view, setView] = useState<"dashboard" | "repo">("dashboard");
   const [repositories, setRepositories] = useState<Repository[]>([
     { name: "biznesgo", description: "Markaziy master katalog", count: 0 },
   ]);
@@ -125,6 +126,13 @@ export function App() {
     }
   };
 
+  const handleSelectRepo = (repoName: string) => {
+    setCurrentRepo(repoName);
+    setCurrentFolder(null);
+    setSelectedMedicine(null);
+    setView("repo");
+  };
+
   const handleResetBot = async () => {
     if (!confirm("Telegram botning eski buyruqlarini tozalashni xohlaysizmi?")) return;
     try {
@@ -163,84 +171,85 @@ export function App() {
         onResetBot={handleResetBot}
         resetting={resetting}
         onOpenClone={() => setIsCloneModalOpen(true)}
-      />
-
-      {/* 2. GitHub Repo Header with Breadcrumb and Tabs */}
-      <GitHubRepoHeader
-        activeTab={activeTab}
-        setActiveTab={handleTabChange}
-        medicineCount={medicines.length}
-        onOpenClone={() => setIsCloneModalOpen(true)}
+        currentView={view}
+        onNavigateDashboard={() => setView("dashboard")}
         currentRepo={currentRepo}
       />
 
-      {/* 3. Main Body: Left Repositories Sidebar + Center & Right Content */}
-      <div className="flex-1 w-full max-w-[1440px] mx-auto flex flex-col lg:flex-row min-h-0">
-        {/* Left: Repositories List */}
-        <GitHubRepoSidebar
+      {/* VIEW 1: Main Repositories List Dashboard (Screenshot 1) */}
+      {view === "dashboard" ? (
+        <GitHubRepositoriesDashboard
           repositories={repositories}
-          currentRepo={currentRepo}
-          onSelectRepo={(r) => {
-            setCurrentRepo(r);
-            setCurrentFolder(null);
-            setSelectedMedicine(null);
-          }}
+          onSelectRepo={handleSelectRepo}
           onOpenNewRepoModal={() => setIsCloneModalOpen(true)}
           onDeleteRepo={handleDeleteRepo}
         />
+      ) : (
+        /* VIEW 2: Inside Selected Repository (Screenshot 2) */
+        <div className="flex-1 flex flex-col">
+          {/* GitHub Repo Header with Breadcrumb and Tabs */}
+          <GitHubRepoHeader
+            activeTab={activeTab}
+            setActiveTab={handleTabChange}
+            medicineCount={medicines.length}
+            onOpenClone={() => setIsCloneModalOpen(true)}
+            currentRepo={currentRepo}
+            onBackToDashboard={() => setView("dashboard")}
+          />
 
-        {/* Center & Right: Main Repo Area */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-7">
-          {selectedMedicine ? (
-            /* File Detail View (Code JSON + Image Inspector) */
-            <GitHubFileView
-              medicine={selectedMedicine}
-              onBack={() => setSelectedMedicine(null)}
-              onDelete={handleDelete}
-              onViewImage={handleViewImage}
-            />
-          ) : (
-            /* Repository Directory View + Right Sidebar */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              <div className="lg:col-span-9 space-y-6 min-w-0">
-                <GitHubMedicineTable
-                  medicines={medicines}
-                  loading={loading}
-                  onDelete={handleDelete}
-                  onViewImage={handleViewImage}
-                  onSelectMedicine={(m) => setSelectedMedicine(m)}
-                  onRefresh={fetchData}
-                  currentFolder={currentFolder}
-                  setCurrentFolder={setCurrentFolder}
-                  onOpenClone={() => setIsCloneModalOpen(true)}
-                  latestCommit={latestCommit}
-                  folderCommits={folderCommits}
-                />
+          {/* Repo Body: Code / Folders / Files View */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6">
+            {selectedMedicine ? (
+              /* File Detail View (Code JSON + Image Inspector) */
+              <GitHubFileView
+                medicine={selectedMedicine}
+                onBack={() => setSelectedMedicine(null)}
+                onDelete={handleDelete}
+                onViewImage={handleViewImage}
+              />
+            ) : (
+              /* Repository Directory View + Right Sidebar */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="lg:col-span-9 space-y-6 min-w-0">
+                  <GitHubMedicineTable
+                    medicines={medicines}
+                    loading={loading}
+                    onDelete={handleDelete}
+                    onViewImage={handleViewImage}
+                    onSelectMedicine={(m) => setSelectedMedicine(m)}
+                    onRefresh={fetchData}
+                    currentFolder={currentFolder}
+                    setCurrentFolder={setCurrentFolder}
+                    onOpenClone={() => setIsCloneModalOpen(true)}
+                    latestCommit={latestCommit}
+                    folderCommits={folderCommits}
+                  />
 
-                {/* Folder-specific or Root README.md box below */}
-                <GitHubFolderReadme
-                  currentFolder={currentFolder}
-                  medicines={medicines}
-                  totalCount={stats.total}
-                  uniqueUsers={stats.uniqueUsers}
-                  byUnit={stats.byUnit}
-                />
+                  {/* Folder-specific or Root README.md box below */}
+                  <GitHubFolderReadme
+                    currentFolder={currentFolder}
+                    medicines={medicines}
+                    totalCount={stats.total}
+                    uniqueUsers={stats.uniqueUsers}
+                    byUnit={stats.byUnit}
+                  />
+                </div>
+
+                {/* GitHub Right Sidebar (About, Releases, Packages, Languages) */}
+                <div className="lg:col-span-3">
+                  <GitHubSidebar
+                    totalCount={stats.total}
+                    uniqueUsers={stats.uniqueUsers}
+                  />
+                </div>
               </div>
+            )}
+          </main>
+        </div>
+      )}
 
-              {/* GitHub Right Sidebar (About, Releases, Packages, Languages) */}
-              <div className="lg:col-span-3">
-                <GitHubSidebar
-                  totalCount={stats.total}
-                  uniqueUsers={stats.uniqueUsers}
-                />
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* 4. GitHub Footer */}
-      <footer className="border-t border-[#d0d7de] py-8 px-4 text-xs text-[#57606a] mt-12 bg-white">
+      {/* GitHub Footer */}
+      <footer className="border-t border-[#d0d7de] py-8 px-4 text-xs text-[#57606a] mt-auto bg-white">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
             <svg height="20" aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="20" className="fill-[#57606a]">
@@ -267,6 +276,7 @@ export function App() {
         onSuccess={(repoName?: string) => {
           if (repoName) {
             setCurrentRepo(repoName);
+            setView("repo");
           }
           fetchRepositories();
           fetchData();

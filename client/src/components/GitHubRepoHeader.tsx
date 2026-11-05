@@ -19,6 +19,7 @@ interface GitHubRepoHeaderProps {
   medicineCount: number;
   onOpenClone: () => void;
   currentRepo?: string;
+  onBackToDashboard?: () => void;
 }
 
 export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
@@ -27,6 +28,7 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
   medicineCount,
   onOpenClone,
   currentRepo = "biznesgo",
+  onBackToDashboard,
 }) => {
   return (
     <div className="bg-[#f6f8fa] border-b border-[#d0d7de] pt-5 px-4 sm:px-8">
@@ -35,19 +37,17 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div className="flex items-center space-x-2 text-xl">
             <Bookmark className="w-5 h-5 text-[#57606a]" />
-            <a
-              href="#"
-              className="text-[#0969da] hover:underline font-normal"
+            <button
+              onClick={onBackToDashboard}
+              className="text-[#0969da] hover:underline font-normal cursor-pointer"
+              title="Barcha repozitoriyalarga qaytish"
             >
-              sohibjonsulaymonov
-            </a>
+              mrsovoo
+            </button>
             <span className="text-[#57606a]">/</span>
-            <a
-              href="#"
-              className="text-[#0969da] hover:underline font-bold"
-            >
+            <span className="text-[#0969da] font-bold font-mono">
               {currentRepo}
-            </a>
+            </span>
             <span className="text-[11px] font-medium text-[#57606a] border border-[#d0d7de] rounded-full px-2 py-0.5 ml-2 bg-white">
               Public
             </span>
@@ -64,33 +64,37 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
               <span>Code / Clone</span>
             </button>
 
+            <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-md px-2.5 py-1 font-semibold text-[#24292f] transition">
+              <span>Pin</span>
+            </button>
+
             <div className="inline-flex rounded-md shadow-xs">
-              <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-3 py-1 font-semibold text-[#24292f] transition">
+              <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-2.5 py-1 font-semibold text-[#24292f] transition">
                 <Eye className="w-3.5 h-3.5 text-[#57606a]" />
                 <span>Watch</span>
               </button>
-              <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2.5 py-1 text-[#24292f] font-semibold">
-                1
-              </span>
-            </div>
-
-            <div className="inline-flex rounded-md shadow-xs">
-              <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-3 py-1 font-semibold text-[#24292f] transition">
-                <GitFork className="w-3.5 h-3.5 text-[#57606a]" />
-                <span>Fork</span>
-              </button>
-              <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2.5 py-1 text-[#24292f] font-semibold">
+              <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2 py-1 text-[#24292f] font-semibold text-[11px]">
                 0
               </span>
             </div>
 
             <div className="inline-flex rounded-md shadow-xs">
-              <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-3 py-1 font-semibold text-[#24292f] transition">
+              <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-2.5 py-1 font-semibold text-[#24292f] transition">
+                <GitFork className="w-3.5 h-3.5 text-[#57606a]" />
+                <span>Fork</span>
+              </button>
+              <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2 py-1 text-[#24292f] font-semibold text-[11px]">
+                0
+              </span>
+            </div>
+
+            <div className="inline-flex rounded-md shadow-xs">
+              <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-2.5 py-1 font-semibold text-[#24292f] transition">
                 <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                 <span>Star</span>
               </button>
-              <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2.5 py-1 text-[#24292f] font-semibold">
-                14
+              <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2 py-1 text-[#24292f] font-semibold text-[11px]">
+                0
               </span>
             </div>
           </div>

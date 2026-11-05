@@ -142,3 +142,4 @@ export const GitHubRepoSidebar: React.FC<GitHubRepoSidebarProps> = ({
     </aside>
   );
 };
+
