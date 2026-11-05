@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { config } from "./config.js";
 import { initDb } from "./db/index.js";
-import { initBot } from "./bot/index.js";
+import { setupBot, bot } from "./bot/index.js";
 import medicinesRouter from "./routes/medicines.js";
 import imagesRouter from "./routes/images.js";
 
@@ -20,6 +20,54 @@ app.use(express.json());
 // API routes
 app.use("/api", medicinesRouter);
 app.use("/api", imagesRouter);
+
+// Bot diagnostics endpoint
+app.get("/api/test-bot", async (req, res) => {
+  if (!bot) {
+    return res.status(503).json({
+      success: false,
+      message: "Bot ishga tushmagan (BOT_TOKEN sozlanmagan bo'lishi mumkin).",
+    });
+  }
+
+  try {
+    const me = await bot.api.getMe();
+    const webhookInfo = await bot.api.getWebhookInfo();
+    res.json({
+      success: true,
+      bot: {
+        id: me.id,
+        username: me.username,
+        first_name: me.first_name,
+      },
+      webhookInfo,
+      mode: webhookInfo.url ? "webhook" : "polling",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+// Reset bot menu and commands endpoint (removes Launch App and old commands)
+app.post("/api/bot/reset-menu", async (req, res) => {
+  if (!bot) {
+    return res.status(503).json({ success: false, message: "Bot mavjud emas" });
+  }
+  try {
+    const { resetBotMenuAndCommands } = await import("./bot/index.js");
+    await resetBotMenuAndCommands(bot);
+    res.json({
+      success: true,
+      message: "Bot xotirasi va 'Launch App' tugmasi muvaffaqiyatli olib tashlandi!",
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Health check endpoint (for Render / monitoring)
 app.get("/health", (req, res) => {
@@ -45,8 +93,8 @@ if (fs.existsSync(clientDistPath)) {
   app.get("/", (req, res) => {
     res.send(
       `<h1>💊 BiznesGo - Dori hisobi API va Bot tizimi</h1>` +
-      `<p>Admin panel hali qurilmagan (client/dist mavjud emas). <code>npm run build</code> bajaring.</p>` +
-      `<p><a href="/api/medicines">/api/medicines</a> | <a href="/health">/health</a></p>`
+      `<p>Admin panel hali qurilmagan. <code>npm run build</code> bajaring.</p>` +
+      `<p><a href="/api/medicines">/api/medicines</a> | <a href="/api/test-bot">/api/test-bot</a> | <a href="/health">/health</a></p>`
     );
   });
 }
@@ -58,8 +106,8 @@ async function start() {
   // 1. Initialize Database (Neon PostgreSQL)
   await initDb();
 
-  // 2. Initialize Telegram Bot
-  initBot();
+  // 2. Setup Telegram Bot (Webhook on Render, Polling on local)
+  await setupBot(app);
 
   // 3. Start HTTP Server
   app.listen(config.port, "0.0.0.0", () => {
@@ -70,4 +118,3 @@ async function start() {
 start().catch((err) => {
   console.error("Serverni ishga tushirishda xatolik:", err);
 });
-

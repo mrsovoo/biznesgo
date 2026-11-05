@@ -28,8 +28,8 @@ function clearSession(userId: number) {
 }
 
 export function registerBotHandlers(bot: Bot) {
-  // /start command
-  bot.command("start", async (ctx) => {
+  // Start handler function
+  const handleStart = async (ctx: Context) => {
     const userId = ctx.from?.id;
     if (userId) clearSession(userId);
 
@@ -45,7 +45,11 @@ export function registerBotHandlers(bot: Bot) {
         ...MAIN_KEYBOARD,
       }
     );
-  });
+  };
+
+  // /start command & text variants
+  bot.command("start", handleStart);
+  bot.hears(["/start", "start", "Start", "salom", "Salom", "Qani"], handleStart);
 
   // Cancel command / text
   bot.hears(["❌ Bekor qilish", "/cancel"], async (ctx) => {
