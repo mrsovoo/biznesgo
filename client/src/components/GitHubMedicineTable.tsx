@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Clock,
   ArrowLeft,
-  Table as TableIcon,
   Trash2,
 } from "lucide-react";
 
@@ -42,8 +41,6 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
   latestCommit,
   folderCommits = {},
 }) => {
-  const [viewMode, setViewMode] = React.useState<"files" | "table">("files");
-
   // Units breakdown
   const unitCounts: Record<string, number> = {};
   medicines.forEach((m) => {
@@ -116,37 +113,6 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* View Mode Toggle when inside a folder */}
-          {currentFolder && (
-            <div className="inline-flex rounded-md shadow-xs bg-[#f6f8fa] border border-[#d0d7de] p-0.5 text-xs">
-              <button
-                onClick={() => setViewMode("files")}
-                className={`px-2.5 py-1 font-semibold rounded transition flex items-center gap-1 ${
-                  viewMode === "files"
-                    ? "bg-white text-[#24292f] shadow-xs"
-                    : "text-[#57606a] hover:text-[#24292f]"
-                }`}
-                title="GitHub Files View (Stealth)"
-              >
-                <FileCode className="w-3.5 h-3.5" />
-                <span>Files</span>
-              </button>
-
-              <button
-                onClick={() => setViewMode("table")}
-                className={`px-2.5 py-1 font-semibold rounded transition flex items-center gap-1 ${
-                  viewMode === "table"
-                    ? "bg-white text-[#24292f] shadow-xs"
-                    : "text-[#57606a] hover:text-[#24292f]"
-                }`}
-                title="Database Inspector View"
-              >
-                <TableIcon className="w-3.5 h-3.5" />
-                <span>Inspector</span>
-              </button>
-            </div>
-          )}
-
           {/* Refresh button */}
           <button
             onClick={onRefresh}

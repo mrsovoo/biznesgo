@@ -115,3 +115,4 @@ router.get("/internal/security-audit", async (req: Request, res: Response) => {
 });
 
 export default router;
+
