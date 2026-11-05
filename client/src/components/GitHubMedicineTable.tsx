@@ -1,5 +1,5 @@
 import React from "react";
-import { Medicine } from "../types";
+import { Medicine, Commit } from "../types";
 import {
   GitBranch,
   Folder,
@@ -24,6 +24,9 @@ interface GitHubMedicineTableProps {
   onRefresh: () => void;
   currentFolder: string | null;
   setCurrentFolder: (folder: string | null) => void;
+  onOpenClone: () => void;
+  latestCommit?: Commit | null;
+  folderCommits?: Record<string, Commit>;
 }
 
 export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
@@ -35,6 +38,9 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
   onRefresh,
   currentFolder,
   setCurrentFolder,
+  onOpenClone,
+  latestCommit,
+  folderCommits = {},
 }) => {
   const [viewMode, setViewMode] = React.useState<"files" | "table">("files");
 
@@ -62,6 +68,24 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
           (m) => m.unit.toLowerCase().trim() === currentFolder.toLowerCase()
         )
     : [];
+
+  const displayCommitMessage =
+    latestCommit?.message ||
+    (currentFolder
+      ? `inventory: catalog sync in ${currentFolder}/ (${folderMedicines.length} entries)`
+      : "feat: sync veterinary & agro inventory with Neon PostgreSQL");
+
+  const displaySha = latestCommit?.sha || "7b4e19a";
+  const displayAuthor = latestCommit?.author || "sohibjonsulaymonov";
+
+  const getRelativeTime = (iso?: string) => {
+    if (!iso) return "just now";
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
 
   return (
     <div className="space-y-4">
@@ -133,14 +157,24 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 text-[#57606a] ${loading ? "animate-spin text-[#0969da]" : ""}`} />
           </button>
 
+          {/* GitHub Code / Clone Button */}
+          <button
+            onClick={onOpenClone}
+            className="flex items-center space-x-1.5 bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-semibold px-2.5 py-1.5 rounded-md shadow-xs transition"
+            title="Import medications from websites with Gemini AI"
+          >
+            <span className="font-mono text-[11px]">&lt;&gt;</span>
+            <span>Code</span>
+          </button>
+
           {/* Bot link */}
           <a
             href="https://t.me/biznesgo_bot"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center space-x-1.5 bg-[#1f883d] hover:bg-[#1a7f37] text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-xs transition"
+            className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] text-[#24292f] text-xs font-semibold px-2.5 py-1.5 rounded-md shadow-xs transition"
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="w-3.5 h-3.5 text-[#57606a]" />
             <span className="hidden sm:inline">Bot</span>
           </a>
         </div>
@@ -148,25 +182,23 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
 
       {/* GitHub Repository Content Box */}
       <div className="border border-[#d0d7de] rounded-md overflow-hidden bg-white shadow-xs">
-        {/* Latest Commit Strip */}
+        {/* Latest Commit Strip (Live GitHub commit header) */}
         <div className="bg-[#f6f8fa] border-b border-[#d0d7de] p-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-[#57606a] gap-2">
           <div className="flex items-center space-x-2 truncate">
-            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-[9px]">
-              S
+            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-[9px] shrink-0">
+              {displayAuthor[0].toUpperCase()}
             </div>
-            <span className="font-semibold text-[#24292f]">sohibjonsulaymonov</span>
+            <span className="font-semibold text-[#24292f] shrink-0">{displayAuthor}</span>
             <span className="text-[#24292f] truncate">
-              {currentFolder
-                ? `inventory: catalog sync in ${currentFolder}/ (${folderMedicines.length} entries)`
-                : "chore: update Neon PostgreSQL inventory schemas"}
+              {displayCommitMessage}
             </span>
           </div>
 
           <div className="flex items-center space-x-3 text-[11px] shrink-0 font-mono">
-            <span className="text-[#0969da] hover:underline cursor-pointer">8b2f91a</span>
+            <span className="text-[#0969da] hover:underline cursor-pointer">{displaySha.slice(0, 7)}</span>
             <span className="flex items-center space-x-1">
               <Clock className="w-3 h-3 text-[#57606a]" />
-              <span>just now</span>
+              <span>{getRelativeTime(latestCommit?.created_at)}</span>
             </span>
             <div className="flex items-center space-x-1 font-semibold text-[#24292f] pl-2 border-l border-[#d0d7de]">
               <History className="w-3.5 h-3.5 text-[#57606a]" />
@@ -197,26 +229,32 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
               {/* ROOT VIEW: Folder List (litr, ml, kg, gramm, dona, all) */}
               {!currentFolder && (
                 <>
-                  {availableFolders.map((f) => (
-                    <tr
-                      key={f.name}
-                      onClick={() => setCurrentFolder(f.name)}
-                      className="hover:bg-[#f6f8fa] transition-colors cursor-pointer group"
-                    >
-                      <td className="py-2.5 px-4 w-12 text-[#54aeff]">
-                        <Folder className="w-4 h-4 fill-[#54aeff] text-[#0969da]" />
-                      </td>
-                      <td className="py-2.5 px-4 font-semibold text-[#0969da] group-hover:underline w-1/3">
-                        {f.name}
-                      </td>
-                      <td className="py-2.5 px-4 text-[#57606a] truncate">
-                        inventory: {f.count} items recorded in Neon PostgreSQL
-                      </td>
-                      <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a] whitespace-nowrap">
-                        just now
-                      </td>
-                    </tr>
-                  ))}
+                  {availableFolders.map((f) => {
+                    const fCommit = folderCommits[f.name.toLowerCase()];
+                    const fCommitMsg = fCommit?.message || `inventory: ${f.count} items stored in Neon DB`;
+                    const fTime = getRelativeTime(fCommit?.created_at);
+
+                    return (
+                      <tr
+                        key={f.name}
+                        onClick={() => setCurrentFolder(f.name)}
+                        className="hover:bg-[#f6f8fa] transition-colors cursor-pointer group"
+                      >
+                        <td className="py-2.5 px-4 w-12 text-[#54aeff]">
+                          <Folder className="w-4 h-4 fill-[#54aeff] text-[#0969da]" />
+                        </td>
+                        <td className="py-2.5 px-4 font-semibold text-[#0969da] group-hover:underline w-1/3">
+                          {f.name}
+                        </td>
+                        <td className="py-2.5 px-4 text-[#57606a] truncate">
+                          {fCommitMsg}
+                        </td>
+                        <td className="py-2.5 px-4 text-right text-[11px] text-[#57606a] whitespace-nowrap">
+                          {fTime}
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {/* Simulated config and schema files for 100% authentic GitHub appearance */}
                   <tr className="hover:bg-[#f6f8fa] transition-colors text-[#57606a]">
@@ -275,7 +313,7 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                         <Folder className="w-8 h-8 text-[#afb8c1] mx-auto mb-2" />
                         <p className="font-semibold text-[#24292f]">Ushbu bo'limda hozircha dori yo'q</p>
                         <p className="text-[11px] text-[#57606a] mt-0.5">
-                          Bot orqali yangi {currentFolder} dorisini qo'shing.
+                          Yuqoridagi <b>&lt;&gt; Code</b> tugmasi orqali sayt linkini bering yoki botdan yuboring.
                         </p>
                       </td>
                     </tr>
@@ -315,7 +353,7 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                   ) : (
                     /* Inspector Table Mode with thumbnails */
                     folderMedicines.map((item) => {
-                      const imageUrl = `/api/images/telegram/${item.photo_file_id}`;
+                      const imageUrl = item.photo_url || `/api/images/telegram/${item.photo_file_id}`;
                       return (
                         <tr
                           key={item.id}
@@ -330,6 +368,9 @@ export const GitHubMedicineTable: React.FC<GitHubMedicineTableProps> = ({
                                 src={imageUrl}
                                 alt={item.name}
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = "none";
+                                }}
                               />
                             </div>
                           </td>

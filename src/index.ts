@@ -8,6 +8,8 @@ import { initDb } from "./db/index.js";
 import { setupBot, bot } from "./bot/index.js";
 import medicinesRouter from "./routes/medicines.js";
 import imagesRouter from "./routes/images.js";
+import cloneRouter from "./routes/clone.js";
+import copilotRouter from "./routes/copilot.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +22,8 @@ app.use(express.json());
 // API routes
 app.use("/api", medicinesRouter);
 app.use("/api", imagesRouter);
+app.use("/api", cloneRouter);
+app.use("/api", copilotRouter);
 
 // Bot diagnostics endpoint
 app.get("/api/test-bot", async (req, res) => {

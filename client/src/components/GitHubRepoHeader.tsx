@@ -17,12 +17,14 @@ interface GitHubRepoHeaderProps {
   activeTab: "code" | "medicines" | "insights";
   setActiveTab: (tab: "code" | "medicines" | "insights") => void;
   medicineCount: number;
+  onOpenClone: () => void;
 }
 
 export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
   activeTab,
   setActiveTab,
   medicineCount,
+  onOpenClone,
 }) => {
   return (
     <div className="bg-[#f6f8fa] border-b border-[#d0d7de] pt-5 px-4 sm:px-8">
@@ -50,6 +52,16 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 text-xs">
+            {/* GitHub green action button */}
+            <button
+              onClick={onOpenClone}
+              className="flex items-center space-x-1.5 bg-[#1f883d] hover:bg-[#1a7f37] border border-[rgba(31,35,40,0.15)] text-white font-semibold rounded-md px-3 py-1 shadow-xs transition"
+              title="Clone repository catalog or import from website with AI"
+            >
+              <span className="font-mono text-[11px]">&lt;&gt;</span>
+              <span>Code / Clone</span>
+            </button>
+
             <div className="inline-flex rounded-md shadow-xs">
               <button className="flex items-center space-x-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-[#d0d7de] rounded-l-md px-3 py-1 font-semibold text-[#24292f] transition">
                 <Eye className="w-3.5 h-3.5 text-[#57606a]" />
@@ -76,7 +88,7 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
                 <span>Star</span>
               </button>
               <span className="border-t border-b border-r border-[#d0d7de] bg-white rounded-r-md px-2.5 py-1 text-[#24292f] font-semibold">
-                12
+                14
               </span>
             </div>
           </div>
@@ -105,7 +117,7 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
             }`}
           >
             <CircleDot className="w-4 h-4 text-[#1a7f37]" />
-            <span>Dorilar (Database)</span>
+            <span>Issues (Dorilar)</span>
             <span className="bg-[#afb8c1]/20 text-[#24292f] text-[11px] font-semibold px-1.5 py-0.2 rounded-full">
               {medicineCount}
             </span>
@@ -120,7 +132,7 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
             }`}
           >
             <BarChart2 className="w-4 h-4 text-[#656d76]" />
-            <span>Insights (Statistika)</span>
+            <span>Insights</span>
           </button>
 
           <button className="flex items-center space-x-2 py-3 px-2 border-b-2 border-transparent text-[#656d76] hover:text-[#1f2328] transition whitespace-nowrap">
@@ -150,4 +162,3 @@ export const GitHubRepoHeader: React.FC<GitHubRepoHeaderProps> = ({
     </div>
   );
 };
-

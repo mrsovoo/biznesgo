@@ -4,8 +4,53 @@ import {
   deleteMedicine,
   getStats,
 } from "../services/medicineService.js";
+import {
+  getLatestCommit,
+  getFolderCommits,
+  getAllCommits,
+} from "../services/commitService.js";
 
 const router = Router();
+
+// GET commits history
+router.get("/commits", async (req, res) => {
+  try {
+    const commits = await getAllCommits(30);
+    res.json({ success: true, data: commits });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET latest commit
+router.get("/commits/latest", async (req, res) => {
+  try {
+    const commit = await getLatestCommit();
+    res.json({ success: true, data: commit });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET commits
+router.get("/commits", async (req, res) => {
+  try {
+    const { folder } = req.query;
+    const [latest, folderMap, all] = await Promise.all([
+      getLatestCommit(folder ? String(folder) : undefined),
+      getFolderCommits(),
+      getAllCommits(20),
+    ]);
+    res.json({
+      success: true,
+      latest,
+      folders: folderMap,
+      commits: all,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // GET all medicines
 router.get("/medicines", async (req, res) => {

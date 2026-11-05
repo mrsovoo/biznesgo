@@ -1,4 +1,5 @@
 import { getDbPool } from "../db/index.js";
+import { recordCommit } from "./commitService.js";
 
 export interface Medicine {
   id: number;
@@ -8,6 +9,10 @@ export interface Medicine {
   unit: string;
   quantity: string;
   photo_file_id: string;
+  photo_url?: string | null;
+  description?: string | null;
+  source_url?: string | null;
+  category?: string | null;
   created_at: string;
 }
 
@@ -18,29 +23,80 @@ export interface CreateMedicineDto {
   unit: string;
   quantity: string;
   photo_file_id: string;
+  photo_url?: string | null;
+  description?: string | null;
+  source_url?: string | null;
+  category?: string | null;
 }
 
 // In-memory fallback if database is not connected yet during testing
 const memoryStore: Medicine[] = [];
 let memoryIdCounter = 1;
 
+export async function findMedicineByName(name: string, unit?: string): Promise<Medicine | null> {
+  const db = getDbPool();
+  const cleanName = name.trim().toLowerCase();
+  try {
+    let sql = `SELECT * FROM medicines WHERE LOWER(TRIM(name)) = $1`;
+    const params: any[] = [cleanName];
+
+    if (unit) {
+      params.push(unit.trim().toLowerCase());
+      sql += ` AND LOWER(TRIM(unit)) = $2`;
+    }
+
+    sql += ` LIMIT 1`;
+    const res = await db.query<Medicine>(sql, params);
+    return res.rows[0] || null;
+  } catch (err) {
+    const found = memoryStore.find((m) => {
+      const matchName = m.name.trim().toLowerCase() === cleanName;
+      if (!unit) return matchName;
+      return matchName && m.unit.trim().toLowerCase() === unit.trim().toLowerCase();
+    });
+    return found || null;
+  }
+}
+
 export async function createMedicine(data: CreateMedicineDto): Promise<Medicine> {
   const db = getDbPool();
   try {
     const res = await db.query<Medicine>(
-      `INSERT INTO medicines (telegram_user_id, telegram_username, name, unit, quantity, photo_file_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO medicines (
+        telegram_user_id,
+        telegram_username,
+        name,
+        unit,
+        quantity,
+        photo_file_id,
+        photo_url,
+        description,
+        source_url,
+        category
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         data.telegram_user_id,
         data.telegram_username || null,
-        data.name,
-        data.unit,
+        data.name.trim(),
+        data.unit.trim().toLowerCase(),
         data.quantity,
         data.photo_file_id,
+        data.photo_url || null,
+        data.description || null,
+        data.source_url || null,
+        data.category || null,
       ]
     );
-    return res.rows[0];
+    const newMed = res.rows[0];
+    await recordCommit({
+      message: `feat(catalog): add ${newMed.name} (${newMed.quantity} ${newMed.unit})`,
+      author: newMed.telegram_username ? `@${newMed.telegram_username}` : String(newMed.telegram_user_id),
+      folder: newMed.unit.toLowerCase(),
+      details: { medicineId: newMed.id, action: "add" },
+    }).catch(() => {});
+    return newMed;
   } catch (err) {
     console.warn("Bazaga yozishda xatolik, vaqtinchalik xotiraga yozilmoqda:", err);
     const item: Medicine = {
@@ -51,6 +107,10 @@ export async function createMedicine(data: CreateMedicineDto): Promise<Medicine>
       unit: data.unit,
       quantity: data.quantity,
       photo_file_id: data.photo_file_id,
+      photo_url: data.photo_url || null,
+      description: data.description || null,
+      source_url: data.source_url || null,
+      category: data.category || null,
       created_at: new Date().toISOString(),
     };
     memoryStore.unshift(item);
@@ -69,13 +129,13 @@ export async function getAllMedicines(query?: {
     const conditions: string[] = [];
 
     if (query?.search) {
-      params.push(`%${query.search}%`);
-      conditions.push(`(name ILIKE $${params.length} OR unit ILIKE $${params.length})`);
+      params.push(`%${query.search.trim()}%`);
+      conditions.push(`(name ILIKE $${params.length} OR unit ILIKE $${params.length} OR category ILIKE $${params.length})`);
     }
 
     if (query?.unit && query.unit !== "all") {
-      params.push(query.unit);
-      conditions.push(`unit = $${params.length}`);
+      params.push(query.unit.trim().toLowerCase());
+      conditions.push(`LOWER(unit) = $${params.length}`);
     }
 
     if (conditions.length > 0) {
@@ -91,7 +151,12 @@ export async function getAllMedicines(query?: {
     let list = [...memoryStore];
     if (query?.search) {
       const s = query.search.toLowerCase();
-      list = list.filter((m) => m.name.toLowerCase().includes(s) || m.unit.toLowerCase().includes(s));
+      list = list.filter(
+        (m) =>
+          m.name.toLowerCase().includes(s) ||
+          m.unit.toLowerCase().includes(s) ||
+          (m.category && m.category.toLowerCase().includes(s))
+      );
     }
     if (query?.unit && query.unit !== "all") {
       list = list.filter((m) => m.unit.toLowerCase() === query.unit?.toLowerCase());
@@ -104,7 +169,15 @@ export async function deleteMedicine(id: number): Promise<boolean> {
   const db = getDbPool();
   try {
     const res = await db.query(`DELETE FROM medicines WHERE id = $1`, [id]);
-    return (res.rowCount ?? 0) > 0;
+    const deleted = (res.rowCount ?? 0) > 0;
+    if (deleted) {
+      await recordCommit({
+        message: `chore(catalog): remove item #${id} from inventory`,
+        author: "admin",
+        folder: "root",
+      }).catch(() => {});
+    }
+    return deleted;
   } catch (err) {
     const idx = memoryStore.findIndex((m) => m.id === id);
     if (idx !== -1) {
@@ -122,7 +195,8 @@ export async function getStats() {
 
   const byUnit: Record<string, number> = {};
   medicines.forEach((m) => {
-    byUnit[m.unit] = (byUnit[m.unit] || 0) + 1;
+    const u = m.unit.toLowerCase();
+    byUnit[u] = (byUnit[u] || 0) + 1;
   });
 
   return {
@@ -131,4 +205,3 @@ export async function getStats() {
     byUnit,
   };
 }
-

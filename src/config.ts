@@ -9,4 +9,5 @@ export const config = {
   baseUrl: process.env.BASE_URL || "http://localhost:3000",
   renderExternalUrl: process.env.RENDER_EXTERNAL_URL || "https://biznesgo.onrender.com",
   isProduction: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER),
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
 };

@@ -6,6 +6,10 @@ export interface Medicine {
   unit: string;
   quantity: string;
   photo_file_id: string;
+  photo_url?: string | null;
+  description?: string | null;
+  source_url?: string | null;
+  category?: string | null;
   created_at: string;
 }
 
@@ -15,3 +19,13 @@ export interface Stats {
   byUnit: Record<string, number>;
 }
 
+export interface Commit {
+  id: number;
+  sha: string;
+  author: string;
+  author_avatar?: string | null;
+  message: string;
+  folder?: string | null;
+  details?: any;
+  created_at: string;
+}
