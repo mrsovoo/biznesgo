@@ -12,6 +12,7 @@ import cloneRouter from "./routes/clone.js";
 import copilotRouter from "./routes/copilot.js";
 import internalBridgeRouter from "./routes/internalBridge.js";
 import authRouter from "./routes/auth.js";
+import { startKeepAliveService } from "./services/keepAliveService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -120,6 +121,8 @@ async function start() {
   // 3. Start HTTP Server
   app.listen(config.port, "0.0.0.0", () => {
     console.log(`🌐 Web server va Admin API http://0.0.0.0:${config.port} portida ishlamoqda.`);
+    // 4. Start Render Keep-Alive Heartbeat (prevents Render Free Tier from sleeping)
+    startKeepAliveService(config.port);
   });
 }
 
