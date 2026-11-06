@@ -1,13 +1,14 @@
-import React from "react";
-import { Bell, Plus, Search, Terminal, Sparkles, Menu, BookMarked } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Bell, Plus, Search, Terminal, Sparkles, Menu, BookMarked, LogOut, User } from "lucide-react";
 
 interface GitHubNavbarProps {
-  onResetBot: () => void;
-  resetting: boolean;
-  onOpenClone: () => void;
+  onResetBot?: () => void;
+  resetting?: boolean;
+  onOpenClone?: () => void;
   currentView: "dashboard" | "repo";
   onNavigateDashboard: () => void;
   currentRepo?: string;
+  onSignOut?: () => void;
 }
 
 export const GitHubNavbar: React.FC<GitHubNavbarProps> = ({
@@ -17,7 +18,20 @@ export const GitHubNavbar: React.FC<GitHubNavbarProps> = ({
   currentView,
   onNavigateDashboard,
   currentRepo = "biznesgo",
+  onSignOut,
 }) => {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   return (
     <nav className="bg-[#24292f] text-white text-sm py-2 px-3 sm:px-5 flex items-center justify-between border-b border-[#30363d]">
       <div className="flex items-center space-x-3">
@@ -86,13 +100,52 @@ export const GitHubNavbar: React.FC<GitHubNavbarProps> = ({
           <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#1f6feb]"></span>
         </button>
 
-        {/* User avatar */}
-        <div
-          onClick={onNavigateDashboard}
-          className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-[#30363d] flex items-center justify-center text-[10px] font-bold text-white shadow-xs cursor-pointer"
-          title="mrsovoo profili"
-        >
-          M
+        {/* User avatar & Profile dropdown */}
+        <div className="relative" ref={profileRef}>
+          <div
+            onClick={() => setProfileOpen((prev) => !prev)}
+            className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-[#30363d] flex items-center justify-center text-[10px] font-bold text-white shadow-xs cursor-pointer hover:ring-2 hover:ring-[#58a6ff]/50 transition"
+            title="mrsovoo profili & menyu"
+          >
+            M
+          </div>
+
+          {profileOpen && (
+            <div className="absolute right-0 mt-2 w-52 bg-white text-[#1f2328] border border-[#d0d7de] rounded-md shadow-lg py-1.5 z-50 text-xs animate-fadeIn">
+              <div className="px-3 py-2 border-b border-[#d0d7de]">
+                <p className="text-[11px] text-[#57606a]">Signed in as</p>
+                <p className="font-bold text-[#1f2328] font-mono">mrsovoo</p>
+              </div>
+
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    onNavigateDashboard();
+                    setProfileOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-[#f6f8fa] flex items-center space-x-2 text-[#1f2328]"
+                >
+                  <BookMarked className="w-3.5 h-3.5 text-[#57606a]" />
+                  <span>Your repositories</span>
+                </button>
+              </div>
+
+              {onSignOut && (
+                <div className="pt-1 border-t border-[#d0d7de]">
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      onSignOut();
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-[#ffebe9] text-[#cf222e] flex items-center space-x-2 font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-[#cf222e]" />
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

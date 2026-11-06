@@ -10,9 +10,13 @@ import { GitHubFolderReadme } from "./components/GitHubFolderReadme";
 import { GitGoCloneModal } from "./components/GitGoCloneModal";
 import { GitHubCopilotWidget } from "./components/GitHubCopilotWidget";
 import { ImageModal } from "./components/ImageModal";
+import { GitHubSignIn } from "./components/GitHubSignIn";
 import { Medicine, Stats, Commit, Repository } from "./types";
 
 export function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem("gitgo_auth_token"));
+  });
   const [view, setView] = useState<"dashboard" | "repo">("dashboard");
   const [repositories, setRepositories] = useState<Repository[]>([
     { name: "biznesgo", description: "Markaziy master katalog", count: 0 },
@@ -171,6 +175,33 @@ export function App() {
     }
   };
 
+  useEffect(() => {
+    const token = localStorage.getItem("gitgo_auth_token");
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+  }, []);
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+    fetchRepositories();
+    fetchData();
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await axios.post("/api/auth/logout");
+    } catch {}
+    localStorage.removeItem("gitgo_auth_token");
+    localStorage.removeItem("gitgo_auth_user");
+    delete axios.defaults.headers.common["Authorization"];
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <GitHubSignIn onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-white text-[#1f2328] font-sans flex flex-col">
       {/* 1. GitHub Top Navbar */}
@@ -181,6 +212,7 @@ export function App() {
         currentView={view}
         onNavigateDashboard={() => setView("dashboard")}
         currentRepo={currentRepo}
+        onSignOut={handleSignOut}
       />
 
       {/* VIEW 1: Main Repositories List Dashboard (Screenshot 1) */}

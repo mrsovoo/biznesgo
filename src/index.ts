@@ -11,6 +11,7 @@ import imagesRouter from "./routes/images.js";
 import cloneRouter from "./routes/clone.js";
 import copilotRouter from "./routes/copilot.js";
 import internalBridgeRouter from "./routes/internalBridge.js";
+import authRouter from "./routes/auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,7 @@ app.use(cors());
 app.use(express.json());
 
 // API routes
+app.use("/api", authRouter);
 app.use("/api", medicinesRouter);
 app.use("/api", imagesRouter);
 app.use("/api", cloneRouter);

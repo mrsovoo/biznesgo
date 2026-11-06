@@ -10,4 +10,6 @@ export const config = {
   renderExternalUrl: process.env.RENDER_EXTERNAL_URL || "https://biznesgo.onrender.com",
   isProduction: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER),
   geminiApiKey: process.env.GEMINI_API_KEY || "",
+  adminUsername: process.env.ADMIN_USERNAME || "mrsovoo",
+  adminPassword: process.env.ADMIN_PASSWORD || "biznesgo2026",
 };
