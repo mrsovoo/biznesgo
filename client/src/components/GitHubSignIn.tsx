@@ -158,3 +158,4 @@ export const GitHubSignIn: React.FC<GitHubSignInProps> = ({ onLoginSuccess }) =>
     </div>
   );
 };
+

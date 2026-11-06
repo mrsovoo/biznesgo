@@ -9,7 +9,7 @@ import {
   getStats,
   Medicine,
 } from "./medicineService.js";
-import { deleteRepository, getAllRepositories, renameRepository } from "./repositoryService.js";
+import { deleteRepository, getAllRepositories, renameRepository, createRepository } from "./repositoryService.js";
 import { cloneMedicinesFromUrl } from "./aiCloneService.js";
 import { getLatestCommit, getAllCommits, recordCommit } from "./commitService.js";
 import { getDbPool } from "../db/index.js";
@@ -60,6 +60,44 @@ export async function getSecurityLogs(limit = 20): Promise<SecurityAuditRecord[]
   }
 }
 
+// Developer SQL execution tool for live system & database changes
+export async function executeDeveloperSql(sql: string): Promise<{
+  success: boolean;
+  rows?: any[];
+  rowCount?: number;
+  error?: string;
+}> {
+  const db = getDbPool();
+  const cleanSql = sql.trim();
+  const upper = cleanSql.toUpperCase();
+
+  // Safety barrier: Prevent catastrophic destruction of primary tables
+  if (
+    upper.includes("DROP DATABASE") ||
+    upper.includes("DROP TABLE MEDICINES") ||
+    upper.includes("DROP TABLE REPOSITORIES")
+  ) {
+    return {
+      success: false,
+      error: "Xavfsizlik cheklovi: Asosiy jadvallarni butunlay DROP qilish taqiqlangan.",
+    };
+  }
+
+  try {
+    const res = await db.query(cleanSql);
+    return {
+      success: true,
+      rows: res.rows,
+      rowCount: res.rowCount ?? (res.rows ? res.rows.length : 0),
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message,
+    };
+  }
+}
+
 // Intermediary security verification challenge for data egress or sharing
 export async function verifyTransferChallenge(data: {
   source: string;
@@ -72,14 +110,12 @@ export async function verifyTransferChallenge(data: {
   const { source, target, reason, pin } = data;
   const operator = data.operator || "admin";
 
-  // Allowed internal targets: only our internal A and B systems
   const isTargetInternal =
     target.toLowerCase().includes("system_b") ||
     target.toLowerCase().includes("internal") ||
     target.toLowerCase().includes("b2b_node") ||
     target.toLowerCase().includes("gitgo_local");
 
-  // If attempting to share to external 3rd party domain
   if (!isTargetInternal && (target.includes("http") || target.includes(".com") || target.includes(".uz") || target.includes("external"))) {
     await logSecurityAudit({
       action: "DATA_EXPORT_ATTEMPT",
@@ -93,16 +129,15 @@ export async function verifyTransferChallenge(data: {
     return {
       allowed: false,
       message:
-        "⛔ XAVFSIZLIK TO'SIG'I (DATA LEAKAGE PREVENTION): Ma'lumotlarni tashqi uchinchi tomon tizimlariga chiqarish qat'iyan taqiqlangan! Ma'lumotlar faqat ichki 'System A' dan 'System B' ga xavfsiz kanallar orqali o'tishi mumkin.",
+        "⛔ XAVFSIZLIK TO'SIG'I (ZERO DATA LEAKAGE): Ma'lumotlarni tashqi uchinchi tomon tizimlariga chiqarish qat'iyan taqiqlangan! Ma'lumotlar faqat ichki 'System A' dan 'System B' ga xavfsiz kanallar orqali o'tishi mumkin.",
       challengeQuestions: [
-        "1. Qabul qiluvchi tizim nima uchun ichki xavfsiz ro'yxatda (whitelist) mavjud emas?",
+        "1. Qabul qiluvchi tizim nima uchun ichki xavfsiz ro'yxatda mavjud emas?",
         "2. Ushbu eksport so'rovi qaysi xavfsizlik protokoli bilan ruxsatlangan?",
         "3. Tizim A dan Tizim B gacha bo'lgan ichki token sertifikati qani?",
       ],
     };
   }
 
-  // PIN security check
   if (pin !== "2026" && pin !== "gitgo_secure") {
     await logSecurityAudit({
       action: "DATA_TRANSFER_CHALLENGE",
@@ -119,7 +154,6 @@ export async function verifyTransferChallenge(data: {
     };
   }
 
-  // Authorized
   await logSecurityAudit({
     action: "AUTHORIZED_INTERNAL_TRANSFER",
     source,
@@ -135,7 +169,7 @@ export async function verifyTransferChallenge(data: {
   };
 }
 
-// Copilot Chat Execution with Full System Access, Deletion & Security Firewall
+// Autonomous Developer AI Copilot (Full system superpowers, direct DB execution, natural reasoning)
 export async function runCopilotChat(data: {
   message: string;
   history?: Array<{ role: "user" | "model"; text: string }>;
@@ -155,99 +189,39 @@ export async function runCopilotChat(data: {
   const lowerMsg = userMsg.toLowerCase();
   const activeRepo = data.currentRepo || "biznesgo";
 
-  // =========================================================================
-  // 1. SECURITY BARRIER: Protect against 3rd-party data leaks
-  // =========================================================================
-  const asksForExternalShare =
-    (lowerMsg.includes("tashqi") || lowerMsg.includes("3-chi") || lowerMsg.includes("3 chi") || lowerMsg.includes("uchinchi") || lowerMsg.includes("begona")) &&
-    (lowerMsg.includes("shaxs") || lowerMsg.includes("odam") || lowerMsg.includes("sayt") || lowerMsg.includes("ber") || lowerMsg.includes("yubor") || lowerMsg.includes("chiqar"));
-
-  if (asksForExternalShare) {
-    await logSecurityAudit({
-      action: "BLOCKED_3RD_PARTY_ATTEMPT",
-      source: "copilot_chat",
-      target: "external_3rd_party",
-      reason: "Foydalanuvchi orqali tashqi 3-shaxsga ma'lumot chiqarish so'rovi to'xtatildi",
-      operator: "copilot_security_firewall",
-      status: "BLOCKED",
-    });
-
-    const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+  if (!apiKey) {
     return {
-      reply: "⛔ **XAVFSIZLIK TO'SIG'I (ZERO DATA LEAKAGE):**\nTizimimizdagi barcha ichki ma'lumotlar (dorilar bazasi, ombor qoldiqlari, shaxsiy hisoblar) tashqi 3-shaxslarga berilishi qat'iyan man etilgan!\n\n🔒 **Ruxsat etilgan yo'nalish:** Ma'lumotlar faqat o'zimizning ichki **Tizim A** (markaziy baza) va **Tizim B** (filial/ichki tugun) o'rtasida shifrlangan maxfiy shlyuz orqali o'tishi mumkin.",
-      actionTaken: "SECURITY_BLOCKED_3RD_PARTY",
-      durationSeconds,
-      thoughts: [
-        "So'rov xavfsizlik tahlilidan o'tkazildi",
-        "Tashqi 3-shaxsga ma'lumot chiqarish xavfi aniqlandi",
-        "Xavfsizlik to'sig'i ishga tushirildi va audit logiga qayd etildi",
-      ],
+      reply: "⚠️ Gemini API Key topilmadi. Iltimos, .env fayliga GEMINI_API_KEY ni qo'ying.",
+      durationSeconds: 1,
     };
   }
 
-  // =========================================================================
-  // 2. INTERNAL BRIDGE: Secure System A -> System B Data Transfer
-  // =========================================================================
-  const asksForInternalTransfer =
-    (lowerMsg.includes("tizim b") || lowerMsg.includes("system b") || lowerMsg.includes("b tizim") || lowerMsg.includes("filial") || lowerMsg.includes("ichki tugun")) &&
-    (lowerMsg.includes("ber") || lowerMsg.includes("o'tkaz") || lowerMsg.includes("otkaz") || lowerMsg.includes("yubor") || lowerMsg.includes("sinxron") || lowerMsg.includes("transfer"));
-
-  if (asksForInternalTransfer) {
-    const meds = await getAllMedicines({ repository: activeRepo });
-    await logSecurityAudit({
-      action: "AUTHORIZED_INTERNAL_TRANSFER",
-      source: "system_a",
-      target: "system_b",
-      reason: `Copilot orqali System A dan System B ga ${meds.length} ta dori xavfsiz ichki shlyuzdan o'tkazildi`,
-      operator: "authorized_admin",
-      status: "AUTHORIZED",
-    });
-
-    const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    return {
-      reply: `✅ **ICHKI TRANZAKSIYA MUVAFFAQIYATLI (Tizim A ➡️ Tizim B):**\n\nJami **${meds.length} ta** dori vositalari o'zimizning xavfsiz ichki kanalimiz orqali **Tizim B** ga muvaffaqiyatli uzatildi.\n\n🛡️ *Tashqi 3-shaxslar va ochiq internet uchun kirish yo'li butunlay bloklangan.*`,
-      actionTaken: "INTERNAL_TRANSFER_SUCCESS",
-      refreshData: true,
-      durationSeconds,
-      thoughts: [
-        "Ichki System A -> System B so'rovi tekshirildi",
-        "Ichki token va xavfsiz shlyuz tasdiqlandi",
-        "Audit logiga AUTHORIZED sifatida muhrlandi",
-      ],
-      data: {
-        source: "System A",
-        target: "System B",
-        count: meds.length,
-      },
-    };
-  }
-
-  // =========================================================================
-  // 3. INGRESS: Auto-clone website catalogs
-  // =========================================================================
+  // 1. Fast Path: Check if user shared a standalone website URL to clone
   const urlRegex = /(https?:\/\/[^\s"'<>]+)/gi;
-  const foundUrls = data.message.match(urlRegex);
+  const foundUrls = userMsg.match(urlRegex);
 
-  if (foundUrls && foundUrls.length > 0) {
-    if (!apiKey) {
-      return {
-        reply: "⚠️ Gemini API Key topilmadi. Klonlash uchun .env fayliga GEMINI_API_KEY qo'ying.",
-        durationSeconds: 1,
-      };
-    }
+  // If message is JUST a URL or "buni klon qil: URL"
+  const isDirectCloneCommand =
+    foundUrls &&
+    foundUrls.length > 0 &&
+    (userMsg.length < 120 || lowerMsg.includes("klon") || lowerMsg.includes("clone") || lowerMsg.includes("tushir"));
+
+  if (isDirectCloneCommand && foundUrls && foundUrls.length > 0) {
     const targetUrl = foundUrls[0];
     try {
-      console.log(`Copilot orqali sayt klonlash boshlandi: ${targetUrl}`);
+      console.log(`Developer Copilot saytni klonlamoqda: ${targetUrl}`);
       const report = await cloneMedicinesFromUrl(targetUrl, apiKey);
       const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
 
-      let reply = `✅ **${report.repoName}** repozitoriyasi ochildi va dorilar klonlandi!\n\n`;
+      let reply = `✅ **${report.repoName}** repozitoriyasi ochildi va katalog to'liq yuklandi!\n\n`;
       reply += `📁 **Repozitoriy:** \`mrsovoo/${report.repoName}\`\n`;
-      reply += `🔗 **Manba:** ${targetUrl}\n`;
-      reply += `📦 **Jami topildi:** ${report.totalFound} ta dori\n`;
-      reply += `✨ **Rasmi va nomi bilan qo'shildi:** ${report.addedCount} ta\n`;
-      reply += `⏭️ **Allaqachon mavjud:** ${report.skippedCount} ta\n\n`;
-      reply += `Barcha dorilar o'zining asl fotosurati, nomi va turi (litr, ml, kg, dona) bo'yicha papkalarga joylandi!`;
+      reply += `🔗 **Asl sayt:** ${targetUrl}\n`;
+      reply += `📦 **Jami aniqlangan mahsulotlar:** ${report.totalFound} ta\n`;
+      reply += `✨ **Baza va papkalarga qo'shildi:** ${report.addedCount} ta\n`;
+      if (report.skippedCount > 0) {
+        reply += `⏭️ **Allaqachon mavjud bo'lgan:** ${report.skippedCount} ta\n`;
+      }
+      reply += `\nDorilar fotosuratlari, nomlari va o'lchov birliklari bo'yicha saralandi. Asosiy \`biznesgo\` master repoda ham barchasi ko'rinadi!`;
 
       return {
         reply,
@@ -255,200 +229,20 @@ export async function runCopilotChat(data: {
         refreshData: true,
         durationSeconds,
         thoughts: [
-          `Yangi repozitoriy yaratildi: ${report.repoName}`,
-          `Faqat dori rasmi, nomi va o'lchov birligi ajratib olindi`,
-          `Neon PostgreSQL bazasiga kiritildi va Git commit qilindi`,
+          `Veb-sayt tahlil qilindi: ${targetUrl}`,
+          `Toza repozitoriya nomi olindi: ${report.repoName}`,
+          `Mahsulotlar fotosuratlari va birliklari bilan PostgreSQL bazasiga kiritildi`,
+          `Git commit muhrlandi`,
         ],
         data: { report, repoName: report.repoName },
       };
     } catch (err: any) {
-      const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-      return {
-        reply: `Kechirasiz, saytni klonlashda xatolik yuz berdi: ${err.message}. Iltimos, havola to'g'riligini tekshiring.`,
-        durationSeconds,
-        thoughts: [`Klonlashda xatolik: ${err.message}`],
-      };
+      console.warn("Clone error:", err.message);
+      // Fall through to AI conversation below if clone had an issue
     }
   }
 
-  // =========================================================================
-  // 4. ACTION CONTROLLER: Full Deletion & Management by AI Command
-  // =========================================================================
-
-  // A. Clear ALL medicines / Reset Catalog
-  const isClearAll =
-    (lowerMsg.includes("barchasini") || lowerMsg.includes("hammasini") || lowerMsg.includes("butunlay") || lowerMsg.includes("hamma dorilarni") || lowerMsg.includes("barcha dorilarni") || lowerMsg.includes("bazani")) &&
-    (lowerMsg.includes("o'chir") || lowerMsg.includes("ochir") || lowerMsg.includes("tozala") || lowerMsg.includes("yo'qot") || lowerMsg.includes("yoqot") || lowerMsg.includes("delete"));
-
-  if (isClearAll) {
-    const result = await clearAllMedicines(activeRepo);
-    const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    return {
-      reply: `🗑️ **Ombor tozalandi!**\n\n${result.repository === "all" ? "Barcha repozitoriyalardagi" : `'${result.repository}' repozitoriyasidagi`} jami **${result.count} ta** dori vositalari bazadan butunlay o'chirildi va ombor tozalandi.`,
-      actionTaken: "CLEAR_ALL_COMPLETED",
-      refreshData: true,
-      durationSeconds,
-      thoughts: [
-        "Foydalanuvchining to'liq tozalash buyrug'i qabul qilindi",
-        `Bazadan ${result.count} ta dori o'chirildi`,
-        "Git commit qayd etildi va ma'lumotlar yangilandi",
-      ],
-    };
-  }
-
-  // B. Delete Repository by Name (e.g. "agroz-ai repozitoriyasini o'chir" or "repozitoriy milytour ni ochir")
-  const repoDeleteMatch =
-    userMsg.match(/(?:repozitoriy|repo|repository)\s+([a-zA-Z0-9_-]+)\s*(?:ni)?\s*(?:o['’`]?chir|delete|tozala)/i) ||
-    userMsg.match(/(?:o['’`]?chir|delete|tozala)\s+(?:repozitoriy|repo|repository)\s+([a-zA-Z0-9_-]+)/i);
-
-  if (repoDeleteMatch && repoDeleteMatch[1]) {
-    const targetRepoName = repoDeleteMatch[1].trim().toLowerCase();
-    if (targetRepoName === "biznesgo") {
-      return {
-        reply: "⚠️ 'biznesgo' asosiy (master) repozitoriya hisoblanadi, uni butunlay o'chirib bo'lmaydi. Lekin ichidagi dorilarni o'chirishingiz mumkin.",
-        durationSeconds: 1,
-      };
-    }
-    const success = await deleteRepository(targetRepoName);
-    const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    return {
-      reply: success
-        ? `🗑️ **Repozitoriy o'chirildi!**\n\n'${targetRepoName}' repozitoriyasi va unga tegishli barcha dorilar butunlay o'chirib tashlandi.`
-        : `⚠️ '${targetRepoName}' repozitoriyasini o'chirishda xatolik yoki u topilmadi.`,
-      actionTaken: "DELETE_REPO_COMPLETED",
-      refreshData: true,
-      durationSeconds,
-      thoughts: [
-        `Repozitoriy o'chirish so'rovi: ${targetRepoName}`,
-        `Baza va repozitoriy jadvallari tozalandi`,
-      ],
-    };
-  }
-
-  // C. Delete by Unit / Folder (e.g. "litr papkasidagi dorilarni o'chir", "ml dagi dorilarni ochir")
-  const unitMatch = lowerMsg.match(/(litr|ml|kg|gramm|dona)\s+(?:papkasini|dorilarini|dagi dorilarni|dagi hamma dorilarni|larni)?\s*(?:o['’`]?chir|tozala|delete)/i);
-  if (unitMatch && unitMatch[1]) {
-    const targetUnit = unitMatch[1].trim().toLowerCase();
-    const result = await deleteMedicinesByUnit(targetUnit, activeRepo);
-    const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    return {
-      reply: `🗑️ **'${targetUnit}' papkasi tozalandi!**\n\nUshbu papkadagi **${result.count} ta** dori vositasi bazadan o'chirildi.`,
-      actionTaken: "DELETE_UNIT_COMPLETED",
-      refreshData: true,
-      durationSeconds,
-      thoughts: [
-        `Birlik bo'yicha tozalash: ${targetUnit}`,
-        `${result.count} ta dori o'chirildi`,
-      ],
-    };
-  }
-
-  // D. Delete Last Medicine (e.g. "oxirgi dorini o'chir", "oxirgisini o'chir")
-  if (lowerMsg.includes("oxirgi") && (lowerMsg.includes("o'chir") || lowerMsg.includes("ochir") || lowerMsg.includes("delete"))) {
-    const allMeds = await getAllMedicines({ repository: activeRepo });
-    if (allMeds.length > 0) {
-      const lastMed = allMeds[0];
-      await deleteMedicine(lastMed.id);
-      const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-      return {
-        reply: `🗑️ **Oxirgi dori o'chirildi!**\n\n'${lastMed.name}' (${lastMed.quantity} ${lastMed.unit}) muvaffaqiyatli o'chirildi.`,
-        actionTaken: "DELETE_LAST_COMPLETED",
-        refreshData: true,
-        durationSeconds,
-        thoughts: [
-          `Oxirgi qo'shilgan dori topildi: #${lastMed.id} ${lastMed.name}`,
-          "Bazadan o'chirildi va Git commit yozildi",
-        ],
-      };
-    } else {
-      return {
-        reply: "Bazada o'chirish uchun dori mavjud emas, ro'yxat bo'sh.",
-        durationSeconds: 1,
-      };
-    }
-  }
-
-  // E. Delete specific medicine by name (e.g. "Amoksitsillinni o'chir", "Alben dorisini ochir", "o'chir biomitsin")
-  const isDeleteIntent = lowerMsg.includes("o'chir") || lowerMsg.includes("ochir") || lowerMsg.includes("delete") || lowerMsg.includes("yo'qot") || lowerMsg.includes("yoqot");
-  if (isDeleteIntent) {
-    // Extract candidate medicine name
-    let cleanQuery = userMsg
-      .replace(/(?:iltimos|jigar|ai|copilot)/gi, "")
-      .replace(/(?:o['’`]?chirib tashla|o['’`]?chir|ochir|delete|yo['’`]?qot)/gi, "")
-      .replace(/(?:dorisini|dori|vositasini|nomli dorini|ni)/gi, "")
-      .trim();
-
-    if (cleanQuery.length >= 2 && !["barchasi", "hamma", "repo", "tizim"].includes(cleanQuery.toLowerCase())) {
-      const delResult = await deleteMedicinesByName(cleanQuery, activeRepo);
-      if (delResult.count > 0) {
-        const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-        return {
-          reply: `🗑️ **Dori o'chirildi!**\n\n"${cleanQuery}" so'rovi bo'yicha **${delResult.count} ta** dori topildi va bazadan o'chirildi:\n${delResult.deletedNames.map((n) => `• ${n}`).join("\n")}`,
-          actionTaken: "DELETE_MEDICINE_COMPLETED",
-          refreshData: true,
-          durationSeconds,
-          thoughts: [
-            `Nom bo'yicha qidirildi: "${cleanQuery}"`,
-            `${delResult.count} ta mos keluvchi dori o'chirildi`,
-            "Git commit yaratildi",
-          ],
-        };
-      }
-    }
-  }
-
-  // F. Rename Repository Intent (e.g. "biznesgo dib nomlagan repo nomini tbovet dib nomla", "biznesgo reponi tbovet qil")
-  const isRenameIntent =
-    (lowerMsg.includes("nomla") || lowerMsg.includes("nomini") || lowerMsg.includes("o'zgartir") || lowerMsg.includes("ozgartir") || lowerMsg.includes("almashtir") || lowerMsg.includes("qil")) &&
-    (lowerMsg.includes("repo") || lowerMsg.includes("nom"));
-
-  if (isRenameIntent) {
-    const match1 = userMsg.match(/([a-zA-Z0-9_-]+)\s*(?:deb|dib)?\s*(?:nomlangan|nomlagan|nomli)?\s*(?:repo|repozitoriy)?\s*(?:nomini|ni)?\s*([a-zA-Z0-9_-]+)\s*(?:deb|dib|ga)?\s*(?:nomla|o['’`]?zgartir|ozgartir|almashtir|qil)/i);
-    const match2 = userMsg.match(/(?:repo|repozitoriy)\s*(?:nomini)?\s*([a-zA-Z0-9_-]+)\s*(?:deb|dib|ga)?\s*(?:nomla|o['’`]?zgartir|ozgartir|almashtir|qil)/i);
-
-    let oldTarget = activeRepo;
-    let newTarget = "";
-
-    if (match1 && match1[1] && match1[2] && !["repo", "repozitoriy", "nomini", "nomi", "barcha"].includes(match1[1].toLowerCase())) {
-      oldTarget = match1[1].trim().toLowerCase();
-      newTarget = match1[2].trim().toLowerCase();
-    } else if (match2 && match2[1]) {
-      newTarget = match2[1].trim().toLowerCase();
-    }
-
-    newTarget = newTarget.replace(/^(deb|dib|ga|ni)/, "").trim();
-
-    if (newTarget && newTarget !== oldTarget) {
-      const success = await renameRepository(oldTarget, newTarget);
-      const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-      return {
-        reply: `✏️ **Repozitoriy nomi o'zgartirildi!**\n\n'**${oldTarget}**' repozitoriyasi va unga tegishli barcha dorilar muvaffaqiyatli '**${newTarget}**' deb qayta nomlandi.\n\nEndi saytda barcha joyda: \`mrsovoo / ${newTarget}\` ko'rinishida bo'ladi!`,
-        actionTaken: "RENAME_REPO_COMPLETED",
-        refreshData: true,
-        durationSeconds,
-        thoughts: [
-          `Repozitoriy qayta nomlash: ${oldTarget} -> ${newTarget}`,
-          `Baza va dorilar jadvallaridagi repository ustuni yangilandi`,
-          `Yangi nom o'rnatildi: mrsovoo / ${newTarget}`,
-        ],
-        data: {
-          oldRepo: oldTarget,
-          newRepo: newTarget,
-        },
-      };
-    }
-  }
-
-  // =========================================================================
-  // 5. NATURAL DIALOGUE & REAL-TIME SYSTEM AWARENESS (Gemini AI)
-  // =========================================================================
-  if (!apiKey) {
-    return {
-      reply: "Salom! Men GitGo tizimining yordamchisiman. Dori o'chirish, klonlash yoki omborni boshqarish bo'yicha buyruq berishingiz mumkin.",
-      durationSeconds: 1,
-    };
-  }
-
+  // 2. Fetch real-time system state for Developer awareness
   const [stats, medicines, latestCommit, repos] = await Promise.all([
     getStats(activeRepo),
     getAllMedicines({ repository: activeRepo }),
@@ -456,80 +250,217 @@ export async function runCopilotChat(data: {
     getAllRepositories(),
   ]);
 
-  const medicineSummary = medicines.slice(0, 15).map((m) => `${m.name} (${m.quantity} ${m.unit})`);
-  const repoSummary = repos.map((r) => r.name).join(", ");
+  const medicineSummary = medicines.slice(0, 10).map((m) => `${m.name} (${m.quantity} ${m.unit}) [${m.repository || "biznesgo"}]`);
+  const repoList = repos.map((r) => `${r.name} (${r.count || 0} ta)`).join(", ");
 
+  // 3. System Developer Persona: Full autonomous developer access
   const systemInstruction = `
-Siz GitGo (veterinariya va agrokimyoviy dori vositalari boshqaruv tizimi) AI Copilotisiz.
-Foydalanuvchi bilan o'zbek tilida juda samimiy, do'stona, aniq va lo'nda suhbatlashing.
+Siz GitGo tizimining bosh dasturchisi va avtonom AI Copilotisiz.
+Siz qandaydir qotib qolgan yoki rasmiyatchi robot EMASSIZ. Siz foydalanuvchining yaqin dasturchi hamkori ("jigar", do'stona, samimiy va o'ta kuchli mutaxassis) sifatida erkin muloqot qilasiz.
 
-SIZNING IMKONIYATLARINGIZ VA QOIDALAR:
-1. Siz to'liq tizim boshqaruvchisiz: sayt linki berilsa dorilarni klonlaysiz; "falon dorini o'chir" desa o'chirasiz; "tizim b ga o'tkaz" desa ichki shlyuz orqali xavfsiz o'tkazasiz.
-2. XAVFSIZLIK: Tashqi 3-shaxslarga ma'lumot berilishi qat'iyan man etilgan! Ma'lumot faqat Tizim A va Tizim B o'rtasida bo'ladi.
-3. ROBOTDEK SOVUQ BO'LMANG! Insondek, lo'nda va tushunarli (2-3 gapda) javob bering.
-4. Agar foydalanuvchi "qanday dorilar bor?" desa, mavjud namunalarni sanab bering.
+SIZDA TIZIMNING BARCHA QISMLARIGA TO'LIQ DASTURCHI (ROOT/DEVELOPER) DASTUPI BOR:
+1. Neon PostgreSQL ma'lumotlar bazasi (dorilar, repozitoriyalar, hisobotlar, foydalanuvchilar).
+2. Tizimdagi istalgan ma'lumotlarni qo'shish, o'zgartirish, nomini almashtirish, o'chirish, tahlil qilish yoki yangi ustun/jadval ochish.
+3. Veb-saytlar kataloglarini klonlash.
+4. Tizim A va Tizim B o'rtasida ma'lumot almashish (lekin tashqi 3-shaxslarga berilmasligi kerak).
 
-JORIY HOLAT:
-- Faol repozitoriy: ${activeRepo}
-- Repozitoriyalar: ${repoSummary}
+BAZADAGI ASOSIY JADVALLAR SXEMASI:
+- medicines (id, name, unit, quantity, photo_file_id, photo_url, description, source_url, category, repository, created_at)
+- repositories (id, name, source_url, description, created_at)
+- commits (id, sha, author, message, folder, details, created_at)
+
+AMALLARNI BAJARISH BUYRUQLARI (ACTIONS):
+Agar foydalanuvchi tizimda biror o'zgartirish kiritishni, dori qo'shishni, o'chirishni, nomini o'zgartirishni yoki SQL so'rovini bajarishni so'rasa, javobingiz ichida quyidagi formatda action blokini qo'shing:
+
+\`\`\`action
+{
+  "type": "sql",
+  "query": "UPDATE medicines SET unit = 'litr' WHERE unit = 'l'"
+}
+\`\`\`
+
+Yoki repozitoriy nomini o'zgartirish uchun:
+\`\`\`action
+{
+  "type": "rename_repo",
+  "oldName": "biznesgo",
+  "newName": "tbovet"
+}
+\`\`\`
+
+Yoki veb-saytni klonlash uchun:
+\`\`\`action
+{
+  "type": "clone",
+  "url": "https://sayt.com/katalog"
+}
+\`\`\`
+
+Yoki aniq dorini o'chirish uchun:
+\`\`\`action
+{
+  "type": "delete_medicine",
+  "name": "dori_nomi"
+}
+\`\`\`
+
+Yoki barcha dorilarni tozalash uchun:
+\`\`\`action
+{
+  "type": "clear_all"
+}
+\`\`\`
+
+MUHIM QOIDALAR:
+- O'zingizni erkin, aqlli, professional va do'stona tuting. Qisqa, samimiy va ishchan javob bering.
+- Agar foydalanuvchi biror o'zgartirish so'rasa, "Men buni qila olmayman" demang! Siz dasturchisiz, siz bevosita SQL va amallar orqali barchasini qila olasiz.
+- Foydalanuvchining istalgan g'oyasi yoki talabini darhol tushunib, amalga oshiring.
+
+JORIY TIZIM HOLATI:
+- Faol tanlangan repo: ${activeRepo}
+- Repozitoriyalar: ${repoList}
 - Dorilar soni: ${stats.total} ta
 - Birliklar: ${JSON.stringify(stats.byUnit)}
-- Oxirgi qo'shilganlar: ${medicineSummary.join("; ") || "Hozircha bo'sh"}
+- Namunaviy dorilar: ${medicineSummary.join("; ") || "Hozircha bo'sh"}
 - Oxirgi commit: ${latestCommit?.message || "Boshlang'ich holat"}
 `;
 
-  const prompt = `Foydalanuvchi: "${userMsg}"\n\nSamimiy, do'stona va lo'nda javob bering:`;
+  // 4. Construct multi-turn contents
+  const contents: any[] = [];
+  if (data.history && Array.isArray(data.history) && data.history.length > 0) {
+    for (const h of data.history.slice(-6)) {
+      contents.push({
+        role: h.role === "user" ? "user" : "model",
+        parts: [{ text: h.text }],
+      });
+    }
+  }
+  contents.push({
+    role: "user",
+    parts: [{ text: userMsg }],
+  });
 
   const aiClient = new GoogleGenAI({ apiKey });
-  const models = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
-  let replyText = "";
+  const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
+  let rawAiReply = "";
 
-  for (const m of models) {
+  for (const model of candidateModels) {
     try {
       const res = await aiClient.models.generateContent({
-        model: m,
-        contents: prompt,
+        model,
+        contents,
         config: {
           systemInstruction,
-          maxOutputTokens: 350,
           temperature: 0.7,
+          maxOutputTokens: 1200,
         },
       });
-      replyText = res.text?.trim() || "";
-      if (replyText) break;
+
+      rawAiReply = res.text?.trim() || "";
+      if (rawAiReply) break;
     } catch (err: any) {
-      try {
-        const interaction = await aiClient.interactions.create({
-          model: m,
-          input: `${systemInstruction}\n\n${prompt}`,
-        });
-        replyText = interaction.output_text?.trim() || "";
-        if (replyText) break;
-      } catch (err2: any) {
-        console.warn(`Copilot model ${m} xatosi:`, err2.message);
-      }
+      console.warn(`Model ${model} xatosi:`, err.message);
     }
   }
 
-  if (!replyText) {
-    replyText = "Tushundim! Tizimda istalgan dorini o'chirish, yangi saytni klonlash yoki Tizim B ga ma'lumotlarni xavfsiz uzatish uchun buyruq berishingiz mumkin.";
+  if (!rawAiReply) {
+    rawAiReply = "Tushundim, jigar! Tizimga dasturchi sifatida ulandim. Qanday o'zgartirish kiritamiz yoki qaysi buyruqni bajaramiz?";
+  }
+
+  // 5. Parse and Execute Developer Action Blocks
+  let actionTaken: string | undefined = undefined;
+  let refreshData = false;
+  let executionNote = "";
+  const thoughts: string[] = ["Foydalanuvchi talabi dasturchi nuqtai nazaridan tahlil qilindi"];
+
+  const actionBlockMatch = rawAiReply.match(/```(?:action|json)?\s*([\s\S]*?)\s*```/);
+  if (actionBlockMatch && actionBlockMatch[1]) {
+    try {
+      const actionData = JSON.parse(actionBlockMatch[1].trim());
+
+      // Action: Direct SQL execution
+      if (actionData.type === "sql" && actionData.query) {
+        thoughts.push(`SQL so'rovi bajarilmoqda: ${actionData.query}`);
+        const sqlRes = await executeDeveloperSql(actionData.query);
+        if (sqlRes.success) {
+          refreshData = true;
+          actionTaken = "SQL_EXECUTED";
+          executionNote = `\n\n⚡ **Baza darajasidagi o'zgarish bajarildi:** ${sqlRes.rowCount} ta qatorga ta'sir qildi.`;
+          await recordCommit({
+            message: `feat(db): AI developer executed: ${actionData.query.slice(0, 60)}...`,
+            author: "copilot-dev",
+            folder: "db",
+          }).catch(() => {});
+        } else {
+          executionNote = `\n\n⚠️ **SQL bajarishda xatolik:** ${sqlRes.error}`;
+        }
+      }
+
+      // Action: Rename repo
+      else if (actionData.type === "rename_repo" && actionData.oldName && actionData.newName) {
+        thoughts.push(`Reponi qayta nomlash: ${actionData.oldName} -> ${actionData.newName}`);
+        const renamed = await renameRepository(actionData.oldName, actionData.newName);
+        if (renamed) {
+          refreshData = true;
+          actionTaken = "REPO_RENAMED";
+          executionNote = `\n\n✏️ **'${actionData.oldName}' repozitoriyasi muvaffaqiyatli '${actionData.newName}' deb qayta nomlandi.**`;
+        }
+      }
+
+      // Action: Clone website URL
+      else if (actionData.type === "clone" && actionData.url) {
+        thoughts.push(`Saytni klonlash: ${actionData.url}`);
+        const report = await cloneMedicinesFromUrl(actionData.url, apiKey);
+        refreshData = true;
+        actionTaken = "CLONE_COMPLETED";
+        executionNote = `\n\n✅ **${report.repoName}** repozitoriyasi ochildi va ${report.addedCount} ta dori yuklandi.`;
+      }
+
+      // Action: Delete medicine
+      else if (actionData.type === "delete_medicine" && actionData.name) {
+        thoughts.push(`Dorini o'chirish: ${actionData.name}`);
+        const delRes = await deleteMedicinesByName(actionData.name, activeRepo);
+        if (delRes.count > 0) {
+          refreshData = true;
+          actionTaken = "MEDICINE_DELETED";
+          executionNote = `\n\n🗑️ **${delRes.count} ta dori ombordan o'chirildi.**`;
+        }
+      }
+
+      // Action: Clear all
+      else if (actionData.type === "clear_all") {
+        thoughts.push(`Omborni tozalash`);
+        const clearRes = await clearAllMedicines(activeRepo);
+        refreshData = true;
+        actionTaken = "ALL_CLEARED";
+        executionNote = `\n\n🗑️ **Ombordagi ${clearRes.count} ta dori to'liq tozalandi.**`;
+      }
+    } catch {
+      // JSON parse error in action block - ignore and return normal text
+    }
+  }
+
+  // Clean the action code block from visible chat text so user gets a clean, human reply
+  let cleanVisibleReply = rawAiReply
+    .replace(/```(?:action|json)?\s*[\s\S]*?\s*```/g, "")
+    .trim();
+
+  if (executionNote) {
+    cleanVisibleReply += executionNote;
   }
 
   const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-  const thoughts = [
-    `Foydalanuvchi buyrug'i tahlil qilindi`,
-    `Faol repozitoriy: ${activeRepo} (${stats.total} ta dori)`,
-    `Google Gemini orqali tezkor va do'stona javob qaytarildi`,
-  ];
+  thoughts.push("Natija yangilandi va tizim bilan sinxronlashtirildi");
 
   return {
-    reply: replyText,
+    reply: cleanVisibleReply || "Buyruq muvaffaqiyatli bajarildi, jigar!",
+    actionTaken,
+    refreshData,
     durationSeconds,
     thoughts,
     data: {
+      activeRepo,
       totalMedicines: stats.total,
-      units: stats.byUnit,
-      repositories: repos.length,
     },
   };
 }
